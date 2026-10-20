@@ -250,7 +250,7 @@ const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
 const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
 const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
-const PLAYER_SPEED = 380;
+const PLAYER_SPEED = 330;
 
 const FOOD_COLORS = ['#ff5a5a', '#ffd84d', '#6dff8a', '#4dd2ff', '#c98bff', '#ff8fd0', '#ff9f43', '#b6ff4d'];
 const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이', '통통이', '길쭉이', '몽글이', '반짝이', '뭉치', '초코', '콩이',
@@ -285,7 +285,28 @@ let actx = null, muted = store.get('worm.muted', false), lastEatSnd = 0, lastBum
 function ensureAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
   if (actx && actx.state === 'suspended') actx.resume();
+  unlockIOSAudio();
   Music.sync();
+}
+
+// 아이폰·아이패드는 무음 스위치가 켜져 있으면 웹 오디오가 안 나옴.
+// 미디어 재생으로 오디오 세션을 바꿔서 게임 소리가 나게 함 (터치할 때 실행)
+let silentEl = null;
+function unlockIOSAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (!silentEl) {
+    const n = 800, buf = new Uint8Array(44 + n), dv = new DataView(buf.buffer);
+    const str = (o, t) => { for (let i = 0; i < t.length; i++) buf[o + i] = t.charCodeAt(i); };
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true);
+    dv.setUint16(32, 1, true); dv.setUint16(34, 8, true); str(36, 'data'); dv.setUint32(40, n, true);
+    buf.fill(128, 44);
+    silentEl = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+    silentEl.loop = true;
+    silentEl.setAttribute('playsinline', '');
+  }
+  if (muted) silentEl.pause();
+  else { const pr = silentEl.play(); if (pr && pr.catch) pr.catch(() => {}); }
 }
 function tone(freq, dur, type = 'sine', vol = 0.08, slide = 1, delay = 0) {
   if (!actx || muted) return;
@@ -785,7 +806,7 @@ function makeWorm(o) {
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
     r: radiusOf(level), invuln: o.invuln || 0,
     segs: [],
-    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(290, 335), chaseT: 0, cool: 0 },
+    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(250, 290), chaseT: 0, cool: 0 },
   };
   w.targetAngle = w.angle;
   const sp = w.r * 0.55, len = targetLen(level);
@@ -803,7 +824,7 @@ function spawnAI(level) {
   let p, tries = 0;
   do {
     p = randomPoint(0.88); tries++;
-    const okPlayer = !player || !player.alive || Math.hypot(p.x - player.x, p.y - player.y) > 750;
+    const okPlayer = !player || !player.alive || Math.hypot(p.x - player.x, p.y - player.y) > 1500;
     const okOthers = worms.every((w) => Math.hypot(p.x - w.x, p.y - w.y) > 220);
     if (okPlayer && okOthers) break;
   } while (tries < 40);
@@ -981,7 +1002,7 @@ function aiThink(w, dt) {
         const s = o.segs[i], d = Math.hypot(s.x - w.x, s.y - w.y) - o.r;
         if (d < td) { td = d; threat = s; }
       }
-    } else if (hd < sense && o.invuln <= 0 && hd < pd) { pd = hd; prey = o; }
+    } else if (hd < sense && o.invuln <= 0 && hd < pd && !(o.isPlayer && w.level - o.level > 10)) { pd = hd; prey = o; }
   }
 
   let ta = w.targetAngle;
@@ -989,12 +1010,12 @@ function aiThink(w, dt) {
   if (threat && td < danger) {
     ta = Math.atan2(w.y - threat.y, w.x - threat.x);
     ai.mode = 'flee';
-  } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.isPlayer ? 0.6 : 1))) {
+  } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.isPlayer ? 0.3 : 1))) {
     if (ai.mode !== 'chase') ai.chaseT = 0;
     ai.mode = 'chase'; ai.chaseT += step;
     const lead = Math.min(80, pd * 0.4);
     ta = Math.atan2(prey.y + Math.sin(prey.angle) * lead - w.y, prey.x + Math.cos(prey.angle) * lead - w.x);
-    if (ai.chaseT > (prey.isPlayer ? 3 : 4.5)) { ai.cool = 3.5; ai.mode = 'food'; }
+    if (ai.chaseT > (prey.isPlayer ? 2 : 4.5)) { ai.cool = prey.isPlayer ? 6 : 3.5; ai.mode = 'food'; }
   } else {
     ai.mode = 'food';
     let best = null, bd = 330 * 330;
@@ -1188,7 +1209,7 @@ function update(dt) {
   }
   const k = Math.min(1, dt * 6);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
-  const base = clamp(Math.min(W, H) / 520, 0.78, 1.1);
+  const base = clamp(Math.min(W, H) / 650, 0.6, 0.9);
   const zt = base * clamp(1 - (camR - 10) * 0.0145, 0.5, 1);
   cam.z += (zt - cam.z) * Math.min(1, dt * 2);
 
@@ -1287,6 +1308,7 @@ function render() {
   }
   ctx.globalAlpha = 1;
 
+  if (me) drawThreatArrows(me, z);
   if (state === 'play' && player && player.alive) {
     drawMini();
     if (input.touchId !== null && input.joy) {
@@ -1300,6 +1322,34 @@ function render() {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+// 화면 밖에서 다가오는 큰 뱀 → 가장자리에 빨간 화살표
+function drawThreatArrows(me, z) {
+  const RANGE = 1300, pad = 34;
+  for (const w of worms) {
+    if (w === me || !w.alive || w.level <= me.level) continue;
+    const dx = w.x - me.x, dy = w.y - me.y, d = Math.hypot(dx, dy);
+    if (d > RANGE) continue;
+    const sx = (w.x - cam.x) * z + W / 2, sy = (w.y - cam.y) * z + H / 2;
+    const m = w.r * z;
+    if (sx > -m && sx < W + m && sy > -m && sy < H + m) continue;  // 화면에 보이면 생략
+    const a = Math.atan2(sy - H / 2, sx - W / 2), ca = Math.cos(a), sa = Math.sin(a);
+    const k = Math.min((W / 2 - pad) / Math.abs(ca || 1e-6), (H / 2 - pad) / Math.abs(sa || 1e-6));
+    const ax = W / 2 + ca * k, ay = H / 2 + sa * k;
+    const near = 1 - d / RANGE, size = 12 + near * 10;
+    ctx.globalAlpha = 0.45 + near * 0.55;
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
+    ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(size, 0); ctx.lineTo(-size * 0.7, -size * 0.75); ctx.lineTo(-size * 0.7, size * 0.75); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.font = '12px Jua, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    const lx = ax - ca * (size + 14), ly = ay - sa * (size + 14);
+    ctx.strokeText('Lv.' + w.level, lx, ly); ctx.fillStyle = '#ffd0d0'; ctx.fillText('Lv.' + w.level, lx, ly);
+  }
+  ctx.globalAlpha = 1;
 }
 
 const mini = document.getElementById('mini');
@@ -1516,7 +1566,9 @@ const musicBtn = $('musicBtn');
 const syncMusicBtn = () => { musicBtn.classList.toggle('off', !Music.on); };
 musicBtn.addEventListener('click', () => { Music.on = !Music.on; store.set('worm.music', Music.on); syncMusicBtn(); ensureAudio(); });
 syncMusicBtn();
-document.addEventListener('pointerdown', ensureAudio);
+document.addEventListener('pointerup', ensureAudio);
+document.addEventListener('touchend', ensureAudio);
+document.addEventListener('keydown', ensureAudio);
 
 $('startBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
@@ -1536,7 +1588,11 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
-document.addEventListener('visibilitychange', () => { lastT = 0; if (actx) Music.sync(); });
+document.addEventListener('visibilitychange', () => {
+  lastT = 0;
+  if (actx) Music.sync();
+  if (silentEl) { if (document.hidden || muted) silentEl.pause(); else silentEl.play().catch(() => {}); }
+});
 
 renderSwatches();
 showMenu();
