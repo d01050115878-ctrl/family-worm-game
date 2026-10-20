@@ -92,7 +92,7 @@
   .evo-title { font-size: 15px; color: var(--muted); margin: 4px 0 6px; }
   .evo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px; }
   .evo div { background: rgba(255,255,255,.05); border-radius: 10px; padding: 4px 2px 6px; text-align: center; font-size: 12px; color: var(--muted); }
-  .evo canvas { width: 100%; height: 46px; display: block; }
+  .evo canvas { width: 100%; height: 40px; display: block; }
   .evo b { display: block; color: var(--text); font-weight: normal; font-size: 13px; }
   .btns { display: flex; gap: 10px; }
   .btn { flex: 1; font-family: inherit; font-size: 22px; padding: 12px; border: none; border-radius: 14px; cursor: pointer; color: #2a1300;
@@ -122,7 +122,7 @@
   @media (max-height: 500px) {
     .card h1 { font-size: 28px; } .card .lead { margin: 2px 0 8px; }
     .rules { font-size: 13px; gap: 3px; padding: 8px 12px; }
-    .evo { grid-template-columns: repeat(7, 1fr); } .evo canvas { height: 30px; } .evo div { font-size: 10px; } .evo b { font-size: 11px; }
+    .evo { grid-template-columns: repeat(8, 1fr); } .evo canvas { height: 30px; } .evo div { font-size: 10px; } .evo b { font-size: 11px; }
   }
 </style>
 </head>
@@ -152,7 +152,7 @@
 <div id="startOv" class="overlay">
   <div class="card">
     <h1><span class="em">🪱</span> 지렁이 키우기</h1>
-    <p class="lead">먹이를 먹고 무럭무럭 자라서 황금 용왕이 되어보세요!</p>
+    <p class="lead">무럭무럭 자라서 전설의 용신이 되어보세요!</p>
     <div class="rules">
       <div>🍎 먹이를 먹으면 경험치가 쌓여서 <b>레벨업</b>! 몸이 커지고 모습이 바뀌어요.</div>
       <div class="g">🟢 초록 레벨 = 나보다 작아요 → 부딪히면 냠! 잡아먹어요</div>
@@ -216,16 +216,35 @@ const AI_COUNT = 22;
 const MAX_LEVEL = 999;
 const TAU = Math.PI * 2;
 
+// 진화 단계 — pals: 고른 색깔에 따라 (4가지), pal: 색이 정해진 단계
 const TIERS = [
-  { min: 1,  name: '아기 지렁이',   emoji: '🪱' },
-  { min: 5,  name: '줄무늬 지렁이', emoji: '🌈' },
-  { min: 10, name: '왕 애벌레',     emoji: '🐛' },
-  { min: 15, name: '얼룩 뱀',       emoji: '🐍' },
-  { min: 20, name: '아기 용',       emoji: '🐲' },
-  { min: 25, name: '불꽃 용',       emoji: '🔥' },
-  { min: 30, name: '황금 용왕',     emoji: '👑' },
+  { min: 1,   name: '아기 지렁이',   emoji: '🪱', style: 'worm',
+    pals: [ { a: '#f7a8b8', b: '#ee8ea3', c: '#c94f6d' }, { a: '#a8d8f0', b: '#8cc4e3', c: '#3f86b0' }, { a: '#b8ec8f', b: '#9ddb73', c: '#4f9a2a' }, { a: '#d9a7e8', b: '#c78fd9', c: '#8e4fae' } ] },
+  { min: 5,   name: '줄무늬 지렁이', emoji: '🎏', style: 'stripe',
+    pals: [ { a: '#ffcf3f', b: '#ff7a59', c: '#c4541b' }, { a: '#7fe0ff', b: '#3d8bff', c: '#1f4fb0' }, { a: '#d9f36a', b: '#3fbf5a', c: '#1d7a35' }, { a: '#ff9ad5', b: '#b05cff', c: '#6d2aa8' } ] },
+  { min: 10,  name: '왕 애벌레',     emoji: '🐛', style: 'cater',
+    pals: [ { a: '#ff8fa3', b: '#ffe14d', c: '#c43d5c' }, { a: '#5fd0c8', b: '#ffffff', c: '#23847c' }, { a: '#7ed957', b: '#ffe14d', c: '#3a8f2a' }, { a: '#c38cff', b: '#ffe14d', c: '#7240c2' } ] },
+  { min: 15,  name: '얼룩 뱀',       emoji: '🐍', style: 'snake',
+    pals: [ { a: '#e2563d', b: '#ffd23f', c: '#8f2a1a' }, { a: '#2b7bd6', b: '#9fe8ff', c: '#16437a' }, { a: '#2bb3a3', b: '#ffd23f', c: '#11665d' }, { a: '#8f5bd6', b: '#62e0ff', c: '#4b2a85' } ] },
+  { min: 20,  name: '아기 용',       emoji: '🐲', style: 'dragon',
+    pals: [ { a: '#d63a6a', b: '#f59bbd', c: '#ffe066' }, { a: '#3d7bf0', b: '#8fc2ff', c: '#ffe066' }, { a: '#2f9e56', b: '#9be38a', c: '#ffd23f' }, { a: '#5a4fcf', b: '#a99bff', c: '#7ef0ff' } ] },
+  { min: 30,  name: '녹색 용',       emoji: '🐉', style: 'dragon',  pal: { a: '#2b8a3e', b: '#8ce99a', c: '#ffe066' } },
+  { min: 40,  name: '노랑 용',       emoji: '🐉', style: 'dragon',  pal: { a: '#f2b800', b: '#fff3a0', c: '#e8590c' } },
+  { min: 55,  name: '파랑 용',       emoji: '🐉', style: 'dragon',  pal: { a: '#1c7ed6', b: '#a5d8ff', c: '#ffffff' } },
+  { min: 70,  name: '빨강 용',       emoji: '🐉', style: 'dragon',  pal: { a: '#e03131', b: '#ffa8a8', c: '#ffd43b' } },
+  { min: 90,  name: '보라 용',       emoji: '🐉', style: 'dragon',  pal: { a: '#7048e8', b: '#d0bfff', c: '#ffd43b' } },
+  { min: 120, name: '은빛 용',       emoji: '🥈', style: 'silver',  pal: { a: '#adb5bd', b: '#f8f9fa', c: '#74c0fc' } },
+  { min: 160, name: '불꽃 용',       emoji: '🔥', style: 'fire',    pal: { a: '#d62828', b: '#ff8c1a', c: '#ffe14d' } },
+  { min: 220, name: '흑룡',          emoji: '🖤', style: 'dark',    pal: { a: '#1c1c2e', b: '#34344f', c: '#ff2e63' } },
+  { min: 300, name: '무지개 용',     emoji: '🌈', style: 'rainbow', pal: { a: '#ff6b6b', b: '#ffffff', c: '#ffffff' } },
+  { min: 500, name: '황금 용왕',     emoji: '👑', style: 'gold',    pal: { a: '#f5b700', b: '#ffe680', c: '#fff8d6' } },
+  { min: 999, name: '전설의 용신',   emoji: '🌌', style: 'cosmic',  pal: { a: '#1b1464', b: '#5f3dc4', c: '#ffe066' } },
 ];
 const tierOf = (L) => { let t = 0; for (let i = 0; i < TIERS.length; i++) if (L >= TIERS[i].min) t = i; return t; };
+const palOf = (w) => { const T = TIERS[tierOf(w.level)]; return T.pal || T.pals[w.pal]; };
+const SNAKE_TIER = 3;  // 이 단계부터 혀 + 세로 동공
+const DRAGONISH = new Set(['dragon', 'silver', 'fire', 'dark', 'rainbow', 'gold', 'cosmic']);
+const GLOWING = new Set(['silver', 'fire', 'dark', 'rainbow', 'gold', 'cosmic']);
 const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
 // Lv.30까지는 쑥쑥, 그 뒤로는 천천히 자라다 멈춤 (맵보다 커지지 않게)
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
@@ -233,16 +252,6 @@ const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L))
 const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
 const PLAYER_SPEED = 260;
 
-// 단계별 색 팔레트 (a: 몸, b: 무늬, c: 포인트) — 색깔 선택 4가지
-const PALETTES = [
-  [ { a: '#f7a8b8', b: '#ee8ea3', c: '#c94f6d' }, { a: '#a8d8f0', b: '#8cc4e3', c: '#3f86b0' }, { a: '#b8ec8f', b: '#9ddb73', c: '#4f9a2a' }, { a: '#d9a7e8', b: '#c78fd9', c: '#8e4fae' } ],
-  [ { a: '#ffcf3f', b: '#ff7a59', c: '#c4541b' }, { a: '#7fe0ff', b: '#3d8bff', c: '#1f4fb0' }, { a: '#d9f36a', b: '#3fbf5a', c: '#1d7a35' }, { a: '#ff9ad5', b: '#b05cff', c: '#6d2aa8' } ],
-  [ { a: '#ff8fa3', b: '#ffe14d', c: '#c43d5c' }, { a: '#5fd0c8', b: '#ffffff', c: '#23847c' }, { a: '#7ed957', b: '#ffe14d', c: '#3a8f2a' }, { a: '#c38cff', b: '#ffe14d', c: '#7240c2' } ],
-  [ { a: '#e2563d', b: '#ffd23f', c: '#8f2a1a' }, { a: '#2b7bd6', b: '#9fe8ff', c: '#16437a' }, { a: '#2bb3a3', b: '#ffd23f', c: '#11665d' }, { a: '#8f5bd6', b: '#62e0ff', c: '#4b2a85' } ],
-  [ { a: '#d63a6a', b: '#f59bbd', c: '#ffe066' }, { a: '#3d7bf0', b: '#8fc2ff', c: '#ffe066' }, { a: '#2f9e56', b: '#9be38a', c: '#ffd23f' }, { a: '#5a4fcf', b: '#a99bff', c: '#7ef0ff' } ],
-  [ { a: '#d62828', b: '#ff8c1a', c: '#ffe14d' }, { a: '#0077b6', b: '#00d4ff', c: '#caf0f8' }, { a: '#1b7a43', b: '#7be0a0', c: '#e8ffd6' }, { a: '#6a00f4', b: '#e040fb', c: '#ffb3ff' } ],
-  [ { a: '#f5b700', b: '#ffe680', c: '#fff8d6' }, { a: '#d9dde3', b: '#ffffff', c: '#bde0fe' }, { a: '#f5b700', b: '#ffe680', c: '#fff8d6' }, { a: '#f5b700', b: '#ffe680', c: '#fff8d6' } ],
-];
 const FOOD_COLORS = ['#ff5a5a', '#ffd84d', '#6dff8a', '#4dd2ff', '#c98bff', '#ff8fd0', '#ff9f43', '#b6ff4d'];
 const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이', '통통이', '길쭉이', '몽글이', '반짝이', '뭉치', '초코', '콩이',
   '두부', '망고', '보리', '호떡', '젤리', '팥떡', '구름이', '별이', '방울이', '슝슝이', '먹보', '대장', '번개', '꼬마', '마루',
@@ -311,7 +320,7 @@ resize();
    지렁이 그리기 (단계별 모습)
    ========================================================= */
 function drawWorm(g, w, t, view) {
-  const tier = tierOf(w.level), P = PALETTES[tier][w.pal];
+  const tier = tierOf(w.level), st = TIERS[tier].style, P = palOf(w);
   const segs = w.segs, n = segs.length, R = w.r;
   const radAt = (i) => {
     if (i === 0) return R * 1.08;
@@ -319,17 +328,28 @@ function drawWorm(g, w, t, view) {
     return f < 0.65 ? R : R * (1 - ((f - 0.65) / 0.35) * 0.55);
   };
   const inView = (s, r) => !view || (s.x > view.x0 - r && s.x < view.x1 + r && s.y > view.y0 - r && s.y < view.y1 + r);
+  const dragonish = DRAGONISH.has(st);
+  const baseAlpha = w.invuln > 0 && Math.floor(t * 10) % 2 === 0 ? 0.45 : 1;
 
   g.save();
-  if (w.invuln > 0 && Math.floor(t * 10) % 2 === 0) g.globalAlpha = 0.45;
+  g.globalAlpha = baseAlpha;
+
+  // 전설의 용신: 몸 주위 은하수 빛
+  if (st === 'cosmic') {
+    g.fillStyle = 'rgba(150,120,255,0.12)';
+    g.beginPath();
+    for (let i = 0; i < n; i += 2) { const s = segs[i], r = radAt(i) * 1.9; if (!inView(s, r)) continue; g.moveTo(s.x + r, s.y); g.arc(s.x, s.y, r, 0, TAU); }
+    g.fill();
+  }
 
   // 등 가시 (용 단계 이상)
-  if (tier >= 4) {
+  if (dragonish) {
     g.fillStyle = P.c;
     for (let i = 2; i < n - 2; i += 3) {
       const s = segs[i], p = segs[i - 1], r = radAt(i);
       if (!inView(s, r * 2)) continue;
       const a = Math.atan2(p.y - s.y, p.x - s.x);
+      if (st === 'rainbow') g.fillStyle = `hsl(${(i * 14 - t * 140) % 360},90%,72%)`;
       for (const side of [-1, 1]) {
         const na = a + side * Math.PI / 2;
         g.beginPath();
@@ -343,7 +363,7 @@ function drawWorm(g, w, t, view) {
   }
 
   // 외곽선
-  g.fillStyle = 'rgba(0,0,0,0.32)';
+  g.fillStyle = st === 'dark' ? 'rgba(255,46,99,0.35)' : 'rgba(0,0,0,0.32)';
   g.beginPath();
   for (let i = n - 1; i >= 0; i--) {
     const s = segs[i], r = radAt(i) + Math.max(2, R * 0.12);
@@ -358,24 +378,28 @@ function drawWorm(g, w, t, view) {
     const s = segs[i], r = radAt(i);
     if (!inView(s, r * 2)) continue;
     let col;
-    switch (tier) {
-      case 0: col = (i >= 3 && i <= 5) ? P.c : (i % 3 === 0 ? P.b : P.a); break;
-      case 1: col = (Math.floor(i / 2) % 2) ? P.a : P.b; break;
-      case 5: col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.35 - t * 6)); break;
-      case 6: col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.4 - t * 4)); break;
+    switch (st) {
+      case 'worm': col = (i >= 3 && i <= 5) ? P.c : (i % 3 === 0 ? P.b : P.a); break;
+      case 'stripe': col = (Math.floor(i / 2) % 2) ? P.a : P.b; break;
+      case 'silver': col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.25 - t * 3)); break;
+      case 'fire': col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.35 - t * 6)); break;
+      case 'dark': col = i % 2 ? P.a : P.b; break;
+      case 'rainbow': col = `hsl(${(i * 14 - t * 140) % 360},85%,58%)`; break;
+      case 'gold': col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.4 - t * 4)); break;
+      case 'cosmic': col = mix(P.a, P.b, 0.5 + 0.5 * Math.sin(i * 0.2 - t * 2)); break;
       default: col = P.a;
     }
-    if (i === 0) drawHeadBack(g, w, tier, P, r, t);
-    if (i === 0 && tier >= 5) { g.shadowColor = P.b; g.shadowBlur = 22; }
+    if (i === 0) drawHeadBack(g, w, st, P, r, t);
+    if (i === 0 && GLOWING.has(st)) { g.shadowColor = st === 'dark' ? P.c : st === 'rainbow' ? '#ffffff' : P.b; g.shadowBlur = 22; }
     g.fillStyle = col;
     g.beginPath(); g.arc(s.x, s.y, r, 0, TAU); g.fill();
     g.shadowBlur = 0;
     if (i === 0) continue;
 
     // 무늬
-    switch (tier) {
-      case 2: if (i % 2 === 0) { g.fillStyle = P.b; g.beginPath(); g.arc(s.x, s.y, r * 0.36, 0, TAU); g.fill(); } break;
-      case 3:
+    switch (st) {
+      case 'cater': if (i % 2 === 0) { g.fillStyle = P.b; g.beginPath(); g.arc(s.x, s.y, r * 0.36, 0, TAU); g.fill(); } break;
+      case 'snake':
         if (i % 3 === 0) {
           g.fillStyle = P.b; g.beginPath();
           g.moveTo(s.x, s.y - r * 0.62); g.lineTo(s.x + r * 0.62, s.y); g.lineTo(s.x, s.y + r * 0.62); g.lineTo(s.x - r * 0.62, s.y);
@@ -383,21 +407,36 @@ function drawWorm(g, w, t, view) {
           g.fillStyle = P.c; g.beginPath(); g.arc(s.x, s.y, r * 0.2, 0, TAU); g.fill();
         }
         break;
-      case 4: g.fillStyle = P.b; g.beginPath(); g.arc(s.x, s.y, r * 0.5, 0, TAU); g.fill(); break;
-      case 5: g.fillStyle = 'rgba(255,240,180,0.45)'; g.beginPath(); g.arc(s.x, s.y, r * 0.35, 0, TAU); g.fill(); break;
-      case 6: g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(s.x - r * 0.25, s.y - r * 0.25, r * 0.3, 0, TAU); g.fill(); break;
+      case 'dragon': g.fillStyle = P.b; g.beginPath(); g.arc(s.x, s.y, r * 0.5, 0, TAU); g.fill(); break;
+      case 'fire': g.fillStyle = 'rgba(255,240,180,0.45)'; g.beginPath(); g.arc(s.x, s.y, r * 0.35, 0, TAU); g.fill(); break;
+      case 'dark':
+        if (i % 3 === 0) {
+          g.globalAlpha = baseAlpha * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * 4 + i)));
+          g.fillStyle = P.c; g.beginPath(); g.arc(s.x, s.y, r * 0.22, 0, TAU); g.fill();
+          g.globalAlpha = baseAlpha;
+        }
+        break;
+      case 'cosmic': {
+        const tw = 0.5 + 0.5 * Math.sin(t * 5 + i * 2.3);
+        g.fillStyle = `rgba(255,255,255,${0.4 + 0.6 * tw})`;
+        g.beginPath(); g.arc(s.x + Math.cos(i * 2.1) * r * 0.5, s.y + Math.sin(i * 1.7) * r * 0.5, r * 0.09 + r * 0.06 * tw, 0, TAU); g.fill();
+        if (i % 4 === 0) { g.fillStyle = 'rgba(255,224,102,0.8)'; g.beginPath(); g.arc(s.x - Math.cos(i) * r * 0.3, s.y + Math.sin(i) * r * 0.35, r * 0.08, 0, TAU); g.fill(); }
+        break;
+      }
+      case 'silver': case 'rainbow': case 'gold':
+        g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(s.x - r * 0.25, s.y - r * 0.25, r * 0.3, 0, TAU); g.fill(); break;
       default: g.fillStyle = 'rgba(255,255,255,0.22)'; g.beginPath(); g.arc(s.x - r * 0.28, s.y - r * 0.28, r * 0.32, 0, TAU); g.fill();
     }
   }
 
-  drawHeadFront(g, w, tier, P, radAt(0), t);
+  drawHeadFront(g, w, tier, st, P, radAt(0), t);
   g.restore();
 }
 
 // 머리 뒤쪽 장식 (더듬이, 뿔) — 머리보다 먼저 그림
-function drawHeadBack(g, w, tier, P, r, t) {
+function drawHeadBack(g, w, st, P, r, t) {
   const x = w.x, y = w.y, a = w.angle;
-  if (tier === 2) {
+  if (st === 'cater') {
     g.strokeStyle = P.c; g.lineWidth = Math.max(2, r * 0.14); g.lineCap = 'round';
     for (const side of [-1, 1]) {
       const wob = Math.sin(t * 6 + side) * 0.12;
@@ -407,25 +446,26 @@ function drawHeadBack(g, w, tier, P, r, t) {
       g.fillStyle = P.b; g.beginPath(); g.arc(ex, ey, r * 0.24, 0, TAU); g.fill();
     }
   }
-  if (tier >= 4) {
-    g.fillStyle = tier === 6 ? '#fff3b0' : P.c;
+  if (DRAGONISH.has(st)) {
+    g.fillStyle = st === 'gold' || st === 'cosmic' ? '#fff3b0' : st === 'rainbow' ? '#ffffff' : P.c;
+    const hornLen = st === 'dragon' ? 1.9 : 2.3;
     for (const side of [-1, 1]) {
       const ba = a + side * 2.1;
       const bx = x + Math.cos(a + side * 1.2) * r * 0.75, by = y + Math.sin(a + side * 1.2) * r * 0.75;
       g.beginPath();
       g.moveTo(bx + Math.cos(a) * r * 0.3, by + Math.sin(a) * r * 0.3);
-      g.lineTo(x + Math.cos(ba) * r * 1.9, y + Math.sin(ba) * r * 1.9);
+      g.lineTo(x + Math.cos(ba) * r * hornLen, y + Math.sin(ba) * r * hornLen);
       g.lineTo(bx - Math.cos(a) * r * 0.35, by - Math.sin(a) * r * 0.35);
       g.closePath(); g.fill();
     }
   }
 }
 
-// 얼굴 (눈, 혀, 볼, 왕관)
-function drawHeadFront(g, w, tier, P, r, t) {
+// 얼굴 (눈, 혀, 볼, 왕관, 후광)
+function drawHeadFront(g, w, tier, st, P, r, t) {
   const x = w.x, y = w.y, a = w.angle, look = w.look != null ? w.look : a;
   // 혀
-  if (tier >= 3 && Math.sin(t * 7 + w.id * 1.7) > 0.45) {
+  if (tier >= SNAKE_TIER && Math.sin(t * 7 + w.id * 1.7) > 0.45) {
     const tx = x + Math.cos(a) * r * 1.0, ty = y + Math.sin(a) * r * 1.0;
     const ex = x + Math.cos(a) * r * 1.9, ey = y + Math.sin(a) * r * 1.9;
     g.strokeStyle = '#ff3b5c'; g.lineWidth = Math.max(1.5, r * 0.1); g.lineCap = 'round';
@@ -435,21 +475,24 @@ function drawHeadFront(g, w, tier, P, r, t) {
     g.stroke();
   }
   // 볼터치
-  if (tier <= 2) {
+  if (tier < SNAKE_TIER) {
     g.fillStyle = 'rgba(255,90,120,0.45)';
     for (const side of [-1, 1]) {
       g.beginPath(); g.arc(x + Math.cos(a + side * 1.15) * r * 0.62, y + Math.sin(a + side * 1.15) * r * 0.62, r * 0.2, 0, TAU); g.fill();
     }
   }
   // 눈
-  const eyeR = r * (tier >= 4 ? 0.3 : 0.34);
+  const eyeR = r * (DRAGONISH.has(st) ? 0.3 : 0.34);
+  const eyeCol = st === 'dark' ? '#ff2e63' : st === 'fire' || st === 'gold' ? '#fff27a' : st === 'cosmic' ? '#bde0fe' : '#ffffff';
   for (const side of [-1, 1]) {
     const ex = x + Math.cos(a + side * 0.62) * r * 0.55, ey = y + Math.sin(a + side * 0.62) * r * 0.55;
-    g.fillStyle = tier >= 5 ? '#fff27a' : '#ffffff';
+    if (st === 'dark' || st === 'cosmic') { g.shadowColor = eyeCol; g.shadowBlur = 14; }
+    g.fillStyle = eyeCol;
     g.beginPath(); g.arc(ex, ey, eyeR, 0, TAU); g.fill();
+    g.shadowBlur = 0;
     g.fillStyle = '#1b1b1b';
     const px = ex + Math.cos(look) * eyeR * 0.42, py = ey + Math.sin(look) * eyeR * 0.42;
-    if (tier >= 3) { // 세로 동공
+    if (tier >= SNAKE_TIER) { // 세로 동공
       g.save(); g.translate(px, py); g.rotate(look);
       g.beginPath(); g.ellipse(0, 0, eyeR * 0.22, eyeR * 0.6, 0, 0, TAU); g.fill(); g.restore();
     } else {
@@ -457,15 +500,20 @@ function drawHeadFront(g, w, tier, P, r, t) {
       g.fillStyle = '#fff'; g.beginPath(); g.arc(px - eyeR * 0.18, py - eyeR * 0.18, eyeR * 0.18, 0, TAU); g.fill();
     }
   }
+  // 후광 (전설의 용신)
+  if (st === 'cosmic') {
+    g.strokeStyle = `rgba(255,224,102,${0.55 + 0.3 * Math.sin(t * 3)})`; g.lineWidth = Math.max(2, r * 0.12);
+    g.beginPath(); g.ellipse(x, y - r * 2.1, r * 0.9, r * 0.32, 0, 0, TAU); g.stroke();
+  }
   // 왕관
-  if (tier === 6) {
+  if (st === 'gold' || st === 'cosmic') {
     const cw = r * 1.3, ch = r * 0.8, cx = x, cy = y - r * 0.95;
     g.fillStyle = '#ffd400'; g.strokeStyle = '#b37a00'; g.lineWidth = Math.max(1.5, r * 0.07);
     g.beginPath();
     g.moveTo(cx - cw / 2, cy); g.lineTo(cx - cw / 2, cy - ch); g.lineTo(cx - cw / 4, cy - ch * 0.45);
     g.lineTo(cx, cy - ch * 1.15); g.lineTo(cx + cw / 4, cy - ch * 0.45); g.lineTo(cx + cw / 2, cy - ch); g.lineTo(cx + cw / 2, cy);
     g.closePath(); g.fill(); g.stroke();
-    g.fillStyle = '#ff3b5c'; g.beginPath(); g.arc(cx, cy - ch * 0.3, r * 0.12, 0, TAU); g.fill();
+    g.fillStyle = st === 'cosmic' ? '#7c4dff' : '#ff3b5c'; g.beginPath(); g.arc(cx, cy - ch * 0.3, r * 0.12, 0, TAU); g.fill();
   }
 }
 
@@ -585,7 +633,7 @@ function onPlayerLevelUp(oldTier) {
   ring(player.x, player.y, '#ffd84d', 26);
   if (tier !== oldTier) {
     SFX.evolve();
-    ring(player.x, player.y, PALETTES[tier][player.pal].b, 50);
+    ring(player.x, player.y, palOf(player).b, 50);
     showToast(`<div class="small">✨ 진화! ✨</div><div class="big">${TIERS[tier].emoji} ${TIERS[tier].name}</div><div class="small">Lv.${player.level}</div>`, 2200);
   } else {
     SFX.levelUp();
@@ -659,9 +707,14 @@ function moveWorm(w, dt) {
 
   // 꼬리 효과
   if (nearCam(w.x, w.y, 900)) {
-    const tier = tierOf(w.level), tail = segs[segs.length - 1];
-    if (tier === 5 && Math.random() < 0.5) addParticle(tail.x, tail.y, rand(-30, 30), rand(-30, 30), Math.random() < 0.5 ? '#ff8c1a' : '#ffe14d', rand(2, 5), 0.5);
-    if (tier === 6 && Math.random() < 0.35) { const s = segs[randInt(0, segs.length - 1)]; addParticle(s.x + rand(-w.r, w.r), s.y + rand(-w.r, w.r), 0, -20, '#fff8d6', rand(1.5, 3.5), 0.7); }
+    const st = TIERS[tierOf(w.level)].style, tail = segs[segs.length - 1];
+    if (st === 'fire' && Math.random() < 0.5) addParticle(tail.x, tail.y, rand(-30, 30), rand(-30, 30), Math.random() < 0.5 ? '#ff8c1a' : '#ffe14d', rand(2, 5), 0.5);
+    if (st === 'dark' && Math.random() < 0.3) addParticle(tail.x, tail.y, rand(-20, 20), rand(-20, 20), Math.random() < 0.5 ? '#ff2e63' : '#5a3d7a', rand(2, 4), 0.6);
+    if ((st === 'gold' || st === 'rainbow' || st === 'cosmic' || st === 'silver') && Math.random() < 0.35) {
+      const s = segs[randInt(0, segs.length - 1)];
+      const col = st === 'gold' ? '#fff8d6' : st === 'silver' ? '#e7f5ff' : st === 'cosmic' ? (Math.random() < 0.5 ? '#ffffff' : '#b197fc') : `hsl(${randInt(0, 359)},90%,70%)`;
+      addParticle(s.x + rand(-w.r, w.r), s.y + rand(-w.r, w.r), 0, -20, col, rand(1.5, 3.5), 0.7);
+    }
     if (boosting && Math.random() < 0.6) addParticle(tail.x, tail.y, rand(-20, 20), rand(-20, 20), 'rgba(255,255,255,0.7)', rand(2, 4), 0.35);
   }
 }
@@ -788,7 +841,7 @@ function collide() {
 function eatWorm(winner, loser) {
   loser.alive = false;
   winner.kills++;
-  const P = PALETTES[tierOf(loser.level)][loser.pal];
+  const P = palOf(loser);
   for (let i = 0; i < loser.segs.length; i += 3) {
     const s = loser.segs[i];
     spawnFood(s.x + rand(-loser.r, loser.r), s.y + rand(-loser.r, loser.r), { xp: 1, r: rand(5, 7), color: i % 2 ? P.a : P.b, big: false });
@@ -805,7 +858,7 @@ function eatWorm(winner, loser) {
 function playerDied(by) {
   killer = by;
   SFX.die();
-  const P = PALETTES[tierOf(player.level)][player.pal];
+  const P = palOf(player);
   burst(player.x, player.y, P.a, 50, 320);
   ring(player.x, player.y, '#ff5a5a', 30);
   deadTimer = 1.4;
@@ -1118,8 +1171,9 @@ function renderEvo() {
     for (let k = 0; k < n; k++) fake.segs.push({ x: -k * sp, y: Math.sin(k * 0.32) * r * 0.9 });
     fake.y = fake.segs[0].y;
     const len = n * sp + r * 3.2;
-    const s = Math.min((cw - 8) / len, (ch - 6) / (r * 4.4));
-    g.translate(cw / 2 + (len / 2 - r * 1.6) * s, ch / 2 + (i === 6 ? r * 0.7 * s : 0));
+    const st = TIERS[i].style, crown = st === 'gold' || st === 'cosmic';
+    const s = Math.min((cw - 8) / len, (ch - 6) / (r * (st === 'cosmic' ? 6 : 4.4)));
+    g.translate(cw / 2 + (len / 2 - r * 1.6) * s, ch / 2 + (crown ? r * (st === 'cosmic' ? 1.3 : 0.7) * s : 0));
     g.scale(s, s);
     drawWorm(g, fake, 0.25, null);
   });
@@ -1128,10 +1182,10 @@ function renderEvo() {
 function renderSwatches() {
   const box = $('swatches');
   box.innerHTML = '';
-  PALETTES[1].forEach((p, i) => {
+  TIERS[1].pals.forEach((p, i) => {
     const b = document.createElement('button');
     b.className = 'sw' + (i === selPal ? ' sel' : '');
-    b.style.background = `linear-gradient(135deg, ${PALETTES[0][i].a} 0 50%, ${p.b} 50% 100%)`;
+    b.style.background = `linear-gradient(135deg, ${TIERS[0].pals[i].a} 0 50%, ${p.b} 50% 100%)`;
     b.setAttribute('aria-label', `색깔 ${i + 1}`);
     b.onclick = () => { selPal = i; renderSwatches(); renderEvo(); };
     box.appendChild(b);
