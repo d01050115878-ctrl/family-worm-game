@@ -53,9 +53,14 @@
 
   .round-btn { position: fixed; border: none; color: #fff; font-family: inherit; cursor: pointer; }
   body.touch #mini { right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom)); }
-  body.touch #muteBtn { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); left: auto; right: calc(16px + env(safe-area-inset-right)); transform: none; }
-  #muteBtn { top: 12px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 50%; font-size: 18px;
+  #muteBtn, #musicBtn { top: 12px; width: 40px; height: 40px; border-radius: 50%; font-size: 18px;
     background: var(--panel); border: 1px solid var(--line); }
+  #muteBtn { left: calc(50% + 4px); }
+  #musicBtn { left: calc(50% - 44px); }
+  #musicBtn.off { opacity: .45; }
+  body.touch #muteBtn, body.touch #musicBtn { top: auto; left: auto; right: calc(16px + env(safe-area-inset-right)); width: 46px; height: 46px; font-size: 20px; }
+  body.touch #muteBtn { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  body.touch #musicBtn { bottom: calc(72px + env(safe-area-inset-bottom)); }
   #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 13px; color: var(--muted);
     background: var(--panel); padding: 6px 12px; border-radius: 20px; pointer-events: none; white-space: nowrap; }
 
@@ -136,6 +141,7 @@
   </div>
   <div id="boardPanel" class="panel"><b>🏆 순위</b><ol id="board"></ol></div>
   <canvas id="mini" width="260" height="260"></canvas>
+  <button id="musicBtn" class="round-btn" aria-label="음악 켜기/끄기">🎵</button>
   <button id="muteBtn" class="round-btn" aria-label="소리 켜기/끄기">🔊</button>
   <div id="hint">마우스 방향으로 이동 (방향키도 돼요)</div>
 </div>
@@ -238,6 +244,7 @@ const palOf = (w) => { const T = TIERS[tierOf(w.level)]; return T.pal || T.pals[
 const SNAKE_TIER = 3;  // 이 단계부터 혀 + 세로 동공
 const DRAGONISH = new Set(['dragon', 'silver', 'fire', 'dark', 'rainbow', 'gold', 'cosmic']);
 const GLOWING = new Set(['silver', 'fire', 'dark', 'rainbow', 'gold', 'cosmic']);
+const WINGED = GLOWING;  // 은빛 용부터 날개
 const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
 // Lv.30까지는 쑥쑥, 그 뒤로는 천천히 자라다 멈춤 (맵보다 커지지 않게)
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
@@ -278,6 +285,7 @@ let actx = null, muted = store.get('worm.muted', false), lastEatSnd = 0, lastBum
 function ensureAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
   if (actx && actx.state === 'suspended') actx.resume();
+  Music.sync();
 }
 function tone(freq, dur, type = 'sine', vol = 0.08, slide = 1, delay = 0) {
   if (!actx || muted) return;
@@ -298,6 +306,126 @@ const SFX = {
   gulp() { tone(240, 0.18, 'square', 0.05, 0.5); tone(520, 0.14, 'sine', 0.07, 1.6, 0.09); },
   bump() { const n = performance.now(); if (n - lastBumpSnd < 200) return; lastBumpSnd = n; tone(170, 0.1, 'sine', 0.07, 0.6); },
   die() { tone(480, 0.7, 'sawtooth', 0.06, 0.2); tone(240, 0.7, 'square', 0.03, 0.3, 0.1); },
+};
+
+/* =========================================================
+   배경음악: 펑키 그루브 (WebAudio로 직접 연주, 8마디 반복)
+   ========================================================= */
+const E2 = 82.41, E4 = 329.63;
+const semi = (base, n) => base * Math.pow(2, n / 12);
+// 마디별 근음(E 기준 반음)과 코드: Em9 Em9 A9 A9 Em9 Em9 Cmaj9 B7#9
+const BARS = [[0, 'm9'], [0, 'm9'], [5, '9'], [5, '9'], [0, 'm9'], [0, 'm9'], [-4, 'maj9'], [-5, '7#9']];
+const CHORDS = { m9: [3, 7, 10, 14], '9': [4, 7, 10, 14], maj9: [4, 7, 11, 14], '7#9': [4, 10, 15] };
+const KICK  = [1, 0, 0, 0,  0, 0, 0, .8,  0, 0, 1, 0,  0, 0, 0, 0];
+const SNARE = [0, 0, 0, 0,  1, 0, 0, .25, 0, .3, 0, 0,  1, 0, 0, .3];
+const HAT   = [.7, .3, .6, .3,  .7, .3, .6, .3,  .7, .3, .6, .3,  .7, .3, 1, .3];
+const CLAV  = [0, 0, 1, 0,  0, .6, 0, 0,  0, 0, 1, 0,  0, .6, 0, .5];
+// 슬랩 베이스: [반음, 세기]
+const BASS  = [[0, 1], null, [12, .7], [0, .6],  null, null, [0, .9], [10, .6],  null, [7, .7], null, [0, .9],  [12, .8], null, [10, .6], [7, .5]];
+// 리드 멜로디 (5·6마디): E4 기준 펜타토닉
+const LEAD  = [[7, 0], [10, 3], [12, 6], [10, 8], [7, 10], [5, 11], [3, 14]];
+const LEAD2 = [[12, 0], [15, 2], [12, 4], [10, 6], [7, 8], [10, 10], [7, 12], [5, 13], [7, 14]];
+
+const Music = {
+  on: store.get('worm.music', true), playing: false, bus: null, timer: 0, step: 0, nextT: 0, noise: null,
+  BPM: 108,
+  sync() { if (actx && this.on && !muted && !document.hidden) this.start(); else this.stop(); },
+  start() {
+    if (this.playing || !actx) return;
+    if (!this.noise) {
+      const len = actx.sampleRate, b = actx.createBuffer(1, len, actx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this.noise = b;
+    }
+    const comp = actx.createDynamicsCompressor();
+    this.bus = actx.createGain();
+    this.bus.gain.setValueAtTime(0, actx.currentTime);
+    this.bus.gain.linearRampToValueAtTime(0.6, actx.currentTime + 1);
+    this.bus.connect(comp).connect(actx.destination);
+    this.playing = true; this.step = 0; this.nextT = actx.currentTime + 0.12;
+    this.timer = setInterval(() => this.schedule(), 25);
+  },
+  stop() {
+    if (!this.playing) return;
+    this.playing = false; clearInterval(this.timer);
+    const bus = this.bus, t = actx.currentTime;
+    bus.gain.cancelScheduledValues(t); bus.gain.setValueAtTime(bus.gain.value, t); bus.gain.linearRampToValueAtTime(0, t + 0.3);
+    setTimeout(() => bus.disconnect(), 400);
+  },
+  schedule() {
+    const s16 = 60 / this.BPM / 4;
+    while (this.nextT < actx.currentTime + 0.15) {
+      this.playStep(this.step, this.nextT, s16);
+      this.nextT += s16 * (this.step % 2 === 0 ? 1.12 : 0.88);  // 살짝 셔플해서 그루브
+      this.step = (this.step + 1) % 128;
+    }
+  },
+  playStep(step, t, s16) {
+    const bar = step >> 4, i = step & 15, [root, q] = BARS[bar];
+    if (KICK[i]) this.kick(t, KICK[i]);
+    if (SNARE[i]) this.snare(t, SNARE[i]);
+    if (bar === 7 && i >= 12) this.snare(t, 0.45 + (i - 12) * 0.15);   // 마지막 마디 필인
+    if (HAT[i]) this.hat(t, HAT[i], i === 14 ? 0.2 : 0.045);
+    const b = BASS[i];
+    if (b) this.bass(t, semi(E2, root + b[0]), b[1], s16);
+    if (CLAV[i]) this.clav(t, root, q, CLAV[i]);
+    if ((bar === 3 || bar === 7) && (i === 12 || i === 14)) this.horn(t, root, q, i === 14 ? s16 * 3 : s16);
+    if (bar === 4 || bar === 5) {
+      for (const [n, at] of (bar === 4 ? LEAD : LEAD2)) if (at === i) this.lead(t, n, s16);
+    }
+  },
+  out(node, t, peak, attack, dur) {
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    node.connect(g).connect(this.bus);
+  },
+  osc(type, freq, t, dur) { const o = actx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t); o.start(t); o.stop(t + dur + 0.05); return o; },
+  noiseSrc(t, dur) { const n = actx.createBufferSource(); n.buffer = this.noise; n.start(t, Math.random() * 0.5); n.stop(t + dur + 0.05); return n; },
+  kick(t, v) {
+    const o = this.osc('sine', 150, t, 0.3);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+    this.out(o, t, 0.9 * v, 0.004, 0.28);
+  },
+  snare(t, v) {
+    const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1300;
+    this.noiseSrc(t, 0.18).connect(f);
+    this.out(f, t, 0.32 * v, 0.002, 0.16);
+    this.out(this.osc('triangle', 190, t, 0.1), t, 0.18 * v, 0.002, 0.08);
+  },
+  hat(t, v, dec) {
+    const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7500;
+    this.noiseSrc(t, dec).connect(f);
+    this.out(f, t, 0.1 * v, 0.002, dec);
+  },
+  bass(t, freq, v, s16) {
+    const dur = s16 * 1.8;
+    const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 7;
+    f.frequency.setValueAtTime(2600, t); f.frequency.exponentialRampToValueAtTime(320, t + 0.14);
+    this.osc('sawtooth', freq, t, dur).connect(f);
+    this.out(f, t, 0.3 * v, 0.004, dur);
+  },
+  clav(t, root, q, v) {
+    const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 1.2;
+    for (const n of CHORDS[q]) this.osc('square', semi(E2, root + 12 + n), t, 0.12).connect(f);
+    this.out(f, t, 0.11 * v, 0.003, 0.11);
+  },
+  horn(t, root, q, len) {
+    const dur = len + 0.12;
+    const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.linearRampToValueAtTime(2600, t + 0.05);
+    for (const n of CHORDS[q]) { const o = this.osc('sawtooth', semi(E2, root + 24 + n), t, dur); o.detune.value = Math.random() * 14 - 7; o.connect(f); }
+    this.out(f, t, 0.07, 0.02, dur);
+  },
+  lead(t, n, s16) {
+    const dur = s16 * 1.7;
+    const o = this.osc('square', semi(E4, n), t, dur);
+    const vib = this.osc('sine', 6, t, dur), vg = actx.createGain(); vg.gain.value = 6;
+    vib.connect(vg).connect(o.frequency);
+    const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2400;
+    o.connect(f);
+    this.out(f, t, 0.06, 0.01, dur);
+  },
 };
 
 /* =========================================================
@@ -332,6 +460,19 @@ function drawWorm(g, w, t, view) {
 
   g.save();
   g.globalAlpha = baseAlpha;
+
+  // 바닥 그림자
+  const so = Math.max(3, R * 0.28);
+  g.fillStyle = 'rgba(0,0,0,0.22)';
+  g.beginPath();
+  for (let i = n - 1; i >= 0; i--) {
+    const s = segs[i], r = radAt(i);
+    if (!inView(s, r + so * 2)) continue;
+    g.moveTo(s.x + so + r, s.y + so * 1.4); g.arc(s.x + so, s.y + so * 1.4, r, 0, TAU);
+  }
+  g.fill();
+
+  if (WINGED.has(st) && n > 8) drawWings(g, w, st, P, segs, R, t, inView);
 
   // 전설의 용신: 몸 주위 은하수 빛
   if (st === 'cosmic') {
@@ -391,7 +532,10 @@ function drawWorm(g, w, t, view) {
     if (i === 0) drawHeadBack(g, w, st, P, r, t);
     if (i === 0 && GLOWING.has(st)) { g.shadowColor = st === 'dark' ? P.c : st === 'rainbow' ? '#ffffff' : P.b; g.shadowBlur = 22; }
     g.fillStyle = col;
-    g.beginPath(); g.arc(s.x, s.y, r, 0, TAU); g.fill();
+    g.beginPath();
+    if (i === 0) g.ellipse(s.x, s.y, r * (dragonish || tier >= SNAKE_TIER ? 1.18 : 1.08), r * 0.98, w.angle, 0, TAU);
+    else g.arc(s.x, s.y, r, 0, TAU);
+    g.fill();
     g.shadowBlur = 0;
     if (i === 0) continue;
 
@@ -424,12 +568,78 @@ function drawWorm(g, w, t, view) {
       }
       case 'silver': case 'rainbow': case 'gold':
         g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(s.x - r * 0.25, s.y - r * 0.25, r * 0.3, 0, TAU); g.fill(); break;
-      default: g.fillStyle = 'rgba(255,255,255,0.22)'; g.beginPath(); g.arc(s.x - r * 0.28, s.y - r * 0.28, r * 0.32, 0, TAU); g.fill();
     }
   }
 
+  // 입체감: 아래쪽 음영 + 등줄기 광택 (몸 전체를 한 번에 칠해서 매끈하게)
+  g.fillStyle = st === 'dark' || st === 'cosmic' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.17)';
+  g.beginPath();
+  for (let i = n - 1; i >= 0; i--) {
+    const s = segs[i], r = radAt(i);
+    if (!inView(s, r)) continue;
+    const rr = r * 0.7, ox = s.x + r * 0.27, oy = s.y + r * 0.27;
+    g.moveTo(ox + rr, oy); g.arc(ox, oy, rr, 0, TAU);
+  }
+  g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.28)';
+  g.beginPath();
+  for (let i = n - 1; i >= 0; i--) {
+    const s = segs[i], r = radAt(i);
+    if (!inView(s, r)) continue;
+    const rr = r * 0.3, ox = s.x - r * 0.36, oy = s.y - r * 0.36;
+    g.moveTo(ox + rr, oy); g.arc(ox, oy, rr, 0, TAU);
+  }
+  g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.5)';
+  g.beginPath();
+  for (let i = n - 1; i >= 0; i -= 2) {
+    const s = segs[i], r = radAt(i);
+    if (!inView(s, r)) continue;
+    const rr = r * 0.12, ox = s.x - r * 0.42, oy = s.y - r * 0.42;
+    g.moveTo(ox + rr, oy); g.arc(ox, oy, rr, 0, TAU);
+  }
+  g.fill();
+
   drawHeadFront(g, w, tier, st, P, radAt(0), t);
   g.restore();
+}
+
+// 날개 (은빛 용 이상) — 몸 앞쪽에 붙어서 퍼덕임
+function drawWings(g, w, st, P, segs, R, t, inView) {
+  const k = Math.max(3, Math.round(segs.length * 0.14));
+  const s = segs[k], p = segs[k - 1];
+  if (!inView(s, R * 4)) return;
+  const a = Math.atan2(p.y - s.y, p.x - s.x), ca = Math.cos(a), sa = Math.sin(a);
+  const flap = Math.sin(t * 6 + w.id);
+  const span = R * (2.3 + 0.5 * flap);
+  const membrane = st === 'rainbow' ? `hsla(${(t * 90) % 360},90%,70%,0.8)` : st === 'cosmic' ? 'rgba(124,77,255,0.65)'
+    : st === 'dark' ? 'rgba(60,20,50,0.85)' : st === 'fire' ? 'rgba(255,140,26,0.75)' : st === 'gold' ? 'rgba(255,230,128,0.8)' : 'rgba(230,240,255,0.75)';
+  const frame = st === 'dark' ? P.c : st === 'rainbow' ? '#ffffff' : st === 'silver' ? '#6c7a89' : P.a;
+  for (const side of [-1, 1]) {
+    const nx = Math.cos(a + side * Math.PI / 2), ny = Math.sin(a + side * Math.PI / 2);
+    const fx = s.x + ca * R * 0.7, fy = s.y + sa * R * 0.7;                       // 날개 앞뿌리
+    const bx = s.x - ca * R * 1.7, by = s.y - sa * R * 1.7;                       // 날개 뒷뿌리
+    const tx = s.x + nx * span - ca * R * 0.9, ty = s.y + ny * span - sa * R * 0.9; // 날개 끝
+    const m1x = s.x + nx * span * 0.62 - ca * R * 1.9, m1y = s.y + ny * span * 0.62 - sa * R * 1.9;
+    const m2x = s.x + nx * span * 0.3 - ca * R * 2.2, m2y = s.y + ny * span * 0.3 - sa * R * 2.2;
+    g.beginPath();
+    g.moveTo(fx, fy);
+    g.quadraticCurveTo(s.x + nx * span * 0.75 + ca * R * 0.8, s.y + ny * span * 0.75 + sa * R * 0.8, tx, ty);
+    // 뒤쪽 가장자리: 박쥐 날개처럼 오목하게
+    g.quadraticCurveTo((tx + m1x) / 2 - nx * R * 0.35, (ty + m1y) / 2 - ny * R * 0.35, m1x, m1y);
+    g.quadraticCurveTo((m1x + m2x) / 2 - nx * R * 0.3, (m1y + m2y) / 2 - ny * R * 0.3, m2x, m2y);
+    g.quadraticCurveTo((m2x + bx) / 2 - nx * R * 0.2, (m2y + by) / 2 - ny * R * 0.2, bx, by);
+    g.closePath();
+    g.fillStyle = membrane; g.fill();
+    g.strokeStyle = frame; g.lineWidth = Math.max(1.5, R * 0.1); g.lineJoin = 'round';
+    g.stroke();
+    // 날개 뼈
+    g.beginPath();
+    g.moveTo(s.x, s.y); g.lineTo(tx, ty);
+    g.moveTo(s.x, s.y); g.lineTo(m1x, m1y);
+    g.moveTo(s.x, s.y); g.lineTo(m2x, m2y);
+    g.lineWidth = Math.max(1, R * 0.07); g.stroke();
+  }
 }
 
 // 머리 뒤쪽 장식 (더듬이, 뿔) — 머리보다 먼저 그림
@@ -473,6 +683,27 @@ function drawHeadFront(g, w, tier, st, P, r, t) {
     g.moveTo(ex, ey); g.lineTo(ex + Math.cos(a - 0.6) * r * 0.35, ey + Math.sin(a - 0.6) * r * 0.35);
     g.stroke();
   }
+  // 용 수염 (살랑살랑)
+  if (DRAGONISH.has(st)) {
+    g.strokeStyle = st === 'rainbow' ? '#ffffff' : P.c; g.lineWidth = Math.max(1.5, r * 0.08); g.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      const sx = x + Math.cos(a + side * 0.4) * r * 0.95, sy = y + Math.sin(a + side * 0.4) * r * 0.95;
+      const wave = Math.sin(t * 5 + w.id + side) * 0.5;
+      const cx = sx + Math.cos(a + side * (1.0 + wave * 0.3)) * r * 1.0, cy = sy + Math.sin(a + side * (1.0 + wave * 0.3)) * r * 1.0;
+      const ex = sx + Math.cos(a + side * (2.3 + wave * 0.4)) * r * 1.9, ey = sy + Math.sin(a + side * (2.3 + wave * 0.4)) * r * 1.9;
+      g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(cx, cy, ex, ey); g.stroke();
+    }
+    // 콧구멍
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    for (const side of [-1, 1]) {
+      g.beginPath(); g.arc(x + Math.cos(a + side * 0.22) * r * 0.95, y + Math.sin(a + side * 0.22) * r * 0.95, r * 0.07, 0, TAU); g.fill();
+    }
+  }
+  // 웃는 입 (아기 단계)
+  if (tier < SNAKE_TIER) {
+    g.strokeStyle = 'rgba(80,20,40,0.6)'; g.lineWidth = Math.max(1.2, r * 0.08); g.lineCap = 'round';
+    g.beginPath(); g.arc(x + Math.cos(a) * r * 0.42, y + Math.sin(a) * r * 0.42, r * 0.34, a - 0.75, a + 0.75); g.stroke();
+  }
   // 볼터치
   if (tier < SNAKE_TIER) {
     g.fillStyle = 'rgba(255,90,120,0.45)';
@@ -489,14 +720,27 @@ function drawHeadFront(g, w, tier, st, P, r, t) {
     g.fillStyle = eyeCol;
     g.beginPath(); g.arc(ex, ey, eyeR, 0, TAU); g.fill();
     g.shadowBlur = 0;
+    g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = Math.max(1, eyeR * 0.14); g.stroke();
     g.fillStyle = '#1b1b1b';
     const px = ex + Math.cos(look) * eyeR * 0.42, py = ey + Math.sin(look) * eyeR * 0.42;
     if (tier >= SNAKE_TIER) { // 세로 동공
       g.save(); g.translate(px, py); g.rotate(look);
       g.beginPath(); g.ellipse(0, 0, eyeR * 0.22, eyeR * 0.6, 0, 0, TAU); g.fill(); g.restore();
+      g.fillStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.arc(ex - eyeR * 0.3, ey - eyeR * 0.3, eyeR * 0.2, 0, TAU); g.fill();
     } else {
       g.beginPath(); g.arc(px, py, eyeR * 0.52, 0, TAU); g.fill();
       g.fillStyle = '#fff'; g.beginPath(); g.arc(px - eyeR * 0.18, py - eyeR * 0.18, eyeR * 0.18, 0, TAU); g.fill();
+    }
+  }
+  // 용 눈썹 (늠름하게)
+  if (DRAGONISH.has(st)) {
+    g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = Math.max(1.5, eyeR * 0.3); g.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      const ex = x + Math.cos(a + side * 0.62) * r * 0.55, ey = y + Math.sin(a + side * 0.62) * r * 0.55;
+      g.beginPath();
+      g.moveTo(ex + Math.cos(a + side * 2.2) * eyeR * 1.25, ey + Math.sin(a + side * 2.2) * eyeR * 1.25);
+      g.lineTo(ex + Math.cos(a + side * 0.6) * eyeR * 1.2, ey + Math.sin(a + side * 0.6) * eyeR * 1.2);
+      g.stroke();
     }
   }
   // 후광 (전설의 용신)
@@ -1268,6 +1512,11 @@ const muteBtn = $('muteBtn');
 const syncMute = () => { muteBtn.textContent = muted ? '🔇' : '🔊'; };
 muteBtn.addEventListener('click', () => { muted = !muted; store.set('worm.muted', muted); syncMute(); ensureAudio(); });
 syncMute();
+const musicBtn = $('musicBtn');
+const syncMusicBtn = () => { musicBtn.classList.toggle('off', !Music.on); };
+musicBtn.addEventListener('click', () => { Music.on = !Music.on; store.set('worm.music', Music.on); syncMusicBtn(); ensureAudio(); });
+syncMusicBtn();
+document.addEventListener('pointerdown', ensureAudio);
 
 $('startBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
@@ -1287,7 +1536,7 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
-document.addEventListener('visibilitychange', () => { lastT = 0; });
+document.addEventListener('visibilitychange', () => { lastT = 0; if (actx) Music.sync(); });
 
 renderSwatches();
 showMenu();
