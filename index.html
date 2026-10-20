@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="theme-color" content="#0f1a14">
+<meta name="theme-color" content="#07061a">
 <meta name="description" content="먹이를 먹고 레벨업! 나보다 작은 지렁이는 잡아먹고 큰 지렁이는 피하는 지렁이 키우기 게임">
 <title>지렁이 키우기 🪱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.85em' font-size='90'>🪱</text></svg>">
@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <style>
   :root {
-    --bg: #0f1a14;
+    --bg: #07061a;
     --panel: rgba(10, 18, 14, 0.62);
     --line: rgba(255, 255, 255, 0.12);
     --text: #f4f7f2;
@@ -59,8 +59,14 @@
   #musicBtn { left: calc(50% - 44px); }
   #musicBtn.off { opacity: .45; }
   body.touch #muteBtn, body.touch #musicBtn { top: auto; left: auto; right: calc(16px + env(safe-area-inset-right)); width: 46px; height: 46px; font-size: 20px; }
-  body.touch #muteBtn { bottom: calc(16px + env(safe-area-inset-bottom)); }
-  body.touch #musicBtn { bottom: calc(72px + env(safe-area-inset-bottom)); }
+  body.touch #muteBtn, body.touch #musicBtn { right: calc(39px + env(safe-area-inset-right)); }
+  body.touch #muteBtn { bottom: calc(124px + env(safe-area-inset-bottom)); }
+  body.touch #musicBtn { bottom: calc(178px + env(safe-area-inset-bottom)); }
+  #dashBtn { right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 88px; height: 88px;
+    border-radius: 50%; font-size: 38px; touch-action: none; --p: 100%;
+    background: radial-gradient(circle at 35% 30%, #ffe27a, #ff9f43 70%); box-shadow: 0 4px 14px rgba(0,0,0,.45), inset 0 0 0 4px rgba(255,255,255,.3); }
+  #dashBtn.cool { background: conic-gradient(rgba(255,159,67,.9) var(--p), rgba(30,30,30,.8) 0); }
+  #dashBtn.go { transform: scale(.88); }
   #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 13px; color: var(--muted);
     background: var(--panel); padding: 6px 12px; border-radius: 20px; pointer-events: none; white-space: nowrap; }
 
@@ -141,9 +147,10 @@
   </div>
   <div id="boardPanel" class="panel"><b>🏆 순위</b><ol id="board"></ol></div>
   <canvas id="mini" width="260" height="260"></canvas>
+  <button id="dashBtn" class="round-btn hidden" aria-label="부스터">⚡</button>
   <button id="musicBtn" class="round-btn" aria-label="음악 켜기/끄기">🎵</button>
   <button id="muteBtn" class="round-btn" aria-label="소리 켜기/끄기">🔊</button>
-  <div id="hint">마우스 방향으로 이동 (방향키도 돼요)</div>
+  <div id="hint">마우스로 이동 · 클릭/스페이스 = ⚡부스터</div>
 </div>
 <div id="toast"></div>
 
@@ -154,10 +161,11 @@
     <p class="lead">무럭무럭 자라서 전설의 용신이 되어보세요!</p>
     <div class="rules">
       <div>🍎 먹이를 먹으면 경험치가 쌓여서 <b>레벨업</b>! 몸이 커지고 모습이 바뀌어요.</div>
-      <div class="g">🟢 초록 레벨 = 나보다 작아요 → 부딪히면 냠! 잡아먹어요</div>
-      <div class="r">🔴 빨간 레벨 = 나보다 커요 → 닿으면 먹혀요! 도망쳐요</div>
-      <div class="y">🟡 노란 레벨 = 나와 같아요 → 서로 튕겨나요</div>
-      <div>🕹️ 화면을 누르고 원하는 방향으로 끌면 이동해요 (PC: 마우스·방향키)</div>
+      <div>🐍 <b>머리끼리</b> 부딪히면 레벨 높은 뱀이 잡아먹어요
+        (<span class="g">🟢 나보다 작음</span> · <span class="r">🔴 나보다 큼</span> · <span class="y">🟡 같으면 튕겨요</span>)</div>
+      <div class="r">💥 다른 뱀의 <b>몸통·꼬리</b>에 머리를 부딪히면 부딪힌 뱀이 먹혀요! (레벨 상관없이)</div>
+      <div>💡 큰 뱀 앞을 가로막아 내 몸에 부딪히게 하면 큰 뱀도 잡을 수 있어요</div>
+      <div>🕹️ 화면을 누르고 끌어서 이동 · ⚡ 버튼으로 순간 부스터 (PC: 마우스, 클릭·스페이스)</div>
     </div>
     <div class="row">
       <label for="nameInput">이름</label>
@@ -251,6 +259,8 @@ const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
 const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
 const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
 const PLAYER_SPEED = 330;
+const TONGUE_T = 0.3;  // 먹이 먹을 때 혀 내미는 시간
+const DASH_TIME = 0.55, DASH_MULT = 2.1, DASH_CD_PLAYER = 3, DASH_CD_AI = 5;
 
 const FOOD_COLORS = ['#ff5a5a', '#ffd84d', '#6dff8a', '#4dd2ff', '#c98bff', '#ff8fd0', '#ff9f43', '#b6ff4d'];
 const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이', '통통이', '길쭉이', '몽글이', '반짝이', '뭉치', '초코', '콩이',
@@ -327,6 +337,7 @@ const SFX = {
   gulp() { tone(240, 0.18, 'square', 0.05, 0.5); tone(520, 0.14, 'sine', 0.07, 1.6, 0.09); },
   bump() { const n = performance.now(); if (n - lastBumpSnd < 200) return; lastBumpSnd = n; tone(170, 0.1, 'sine', 0.07, 0.6); },
   die() { tone(480, 0.7, 'sawtooth', 0.06, 0.2); tone(240, 0.7, 'square', 0.03, 0.3, 0.1); },
+  dash() { tone(260, 0.28, 'sawtooth', 0.05, 3.2); tone(520, 0.2, 'triangle', 0.04, 2, 0.04); },
 };
 
 /* =========================================================
@@ -621,6 +632,24 @@ function drawWorm(g, w, t, view) {
   }
   g.fill();
 
+  // 부스터 중: 몸을 따라 반짝이는 빛 물결
+  if (w.dashT > 0) {
+    const fade = Math.min(1, w.dashT / 0.15);
+    for (let i = n - 1; i >= 0; i--) {
+      const s = segs[i], r = radAt(i);
+      if (!inView(s, r)) continue;
+      const wave = 0.5 + 0.5 * Math.sin(i * 0.9 - t * 32);
+      g.globalAlpha = baseAlpha * fade * (0.15 + 0.55 * wave * wave);
+      g.fillStyle = '#fffbe0';
+      g.beginPath(); g.arc(s.x, s.y, r * 0.95, 0, TAU); g.fill();
+    }
+    g.globalAlpha = baseAlpha;
+    g.shadowColor = '#ffe066'; g.shadowBlur = 25;
+    g.strokeStyle = `rgba(255,236,140,${0.8 * fade})`; g.lineWidth = Math.max(2, R * 0.15);
+    g.beginPath(); g.arc(segs[0].x, segs[0].y, radAt(0) * 1.15, 0, TAU); g.stroke();
+    g.shadowBlur = 0;
+  }
+
   drawHeadFront(g, w, tier, st, P, radAt(0), t);
   g.restore();
 }
@@ -694,14 +723,22 @@ function drawHeadBack(g, w, st, P, r, t) {
 // 얼굴 (눈, 혀, 볼, 왕관, 후광)
 function drawHeadFront(g, w, tier, st, P, r, t) {
   const x = w.x, y = w.y, a = w.angle, look = w.look != null ? w.look : a;
-  // 혀
-  if (tier >= SNAKE_TIER && Math.sin(t * 7 + w.id * 1.7) > 0.45) {
-    const tx = x + Math.cos(a) * r * 1.0, ty = y + Math.sin(a) * r * 1.0;
-    const ex = x + Math.cos(a) * r * 1.9, ey = y + Math.sin(a) * r * 1.9;
-    g.strokeStyle = '#ff3b5c'; g.lineWidth = Math.max(1.5, r * 0.1); g.lineCap = 'round';
+  // 혀: 먹이를 먹을 때 먹이 쪽으로 날름, 뱀 단계부터는 평소에도 가끔
+  let tlen = 0, tdir = a;
+  if (w.tongueT > 0) {
+    const k = 1 - w.tongueT / TONGUE_T;
+    tlen = 0.4 + Math.sin(k * Math.PI) * 1.5;
+    tdir = a + clamp(angDiff(w.tongueA, a), -0.7, 0.7);
+  } else if (tier >= SNAKE_TIER && Math.sin(t * 7 + w.id * 1.7) > 0.45) tlen = 0.9;
+  if (tlen > 0) {
+    const tx = x + Math.cos(tdir) * r * 0.95, ty = y + Math.sin(tdir) * r * 0.95;
+    const wob = Math.sin(t * 40) * 0.12 * tlen;
+    const ex = x + Math.cos(tdir + wob) * r * (0.95 + tlen), ey = y + Math.sin(tdir + wob) * r * (0.95 + tlen);
+    g.strokeStyle = tier < SNAKE_TIER ? '#ff6f91' : '#ff3b5c'; g.lineWidth = Math.max(1.8, r * 0.13); g.lineCap = 'round';
     g.beginPath(); g.moveTo(tx, ty); g.lineTo(ex, ey);
-    g.moveTo(ex, ey); g.lineTo(ex + Math.cos(a + 0.6) * r * 0.35, ey + Math.sin(a + 0.6) * r * 0.35);
-    g.moveTo(ex, ey); g.lineTo(ex + Math.cos(a - 0.6) * r * 0.35, ey + Math.sin(a - 0.6) * r * 0.35);
+    const fork = r * (tier < SNAKE_TIER ? 0.22 : 0.38);
+    g.moveTo(ex, ey); g.lineTo(ex + Math.cos(tdir + 0.6) * fork, ey + Math.sin(tdir + 0.6) * fork);
+    g.moveTo(ex, ey); g.lineTo(ex + Math.cos(tdir - 0.6) * fork, ey + Math.sin(tdir - 0.6) * fork);
     g.stroke();
   }
   // 용 수염 (살랑살랑)
@@ -788,9 +825,9 @@ let state = 'menu';            // menu | play | over
 let worms = [], foods = [], particles = [], texts = [];
 let player = null, nextId = 1, time = 0, playStart = 0, deadTimer = 0, spawnTimer = 0;
 let cam = { x: 0, y: 0, z: 1 }, attractTarget = null, attractTimer = 0;
-let killer = null, peakLevel = 1;
+let killer = null, killHow = 'head', peakLevel = 1;
 let selPal = store.get('worm.pal', 0);
-const input = { px: 0, py: 0, mode: 'mouse', keys: {},
+const input = { px: 0, py: 0, mode: 'mouse', keys: {}, dash: false,
   touchId: null, ox: 0, oy: 0, joy: false, joyAngle: 0 };
 
 function randomPoint(margin = 0.97) {
@@ -804,7 +841,7 @@ function makeWorm(o) {
     id: nextId++, name: o.name, isPlayer: !!o.isPlayer, pal: o.pal != null ? o.pal : randInt(0, 3),
     level, xp: o.xp || 0, score: 0, kills: 0, alive: true,
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
-    r: radiusOf(level), invuln: o.invuln || 0,
+    r: radiusOf(level), invuln: o.invuln || 0, dashT: 0, dashCD: 0, dashWant: false,
     segs: [],
     ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(250, 290), chaseT: 0, cool: 0 },
   };
@@ -941,7 +978,16 @@ function moveWorm(w, dt) {
   const turnRate = (w.isPlayer ? 9 : 7) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
   w.angle += clamp(angDiff(w.targetAngle, w.angle), -turnRate * dt, turnRate * dt);
 
-  const sp = w.isPlayer ? PLAYER_SPEED : w.ai.speed;
+  if (w.dashCD > 0) w.dashCD -= dt;
+  if (w.dashT > 0) w.dashT -= dt;
+  if (w.dashWant) {
+    w.dashWant = false;
+    if (w.dashCD <= 0) {
+      w.dashT = DASH_TIME; w.dashCD = w.isPlayer ? DASH_CD_PLAYER : DASH_CD_AI;
+      if (w.isPlayer) SFX.dash();
+    }
+  }
+  const sp = (w.isPlayer ? PLAYER_SPEED : w.ai.speed) * (w.dashT > 0 ? DASH_MULT : 1);
   w.x += Math.cos(w.angle) * sp * dt;
   w.y += Math.sin(w.angle) * sp * dt;
 
@@ -964,10 +1010,18 @@ function moveWorm(w, dt) {
   if (segs.length < tl) { const last = segs[segs.length - 1]; segs.push({ x: last.x, y: last.y }); }
 
   if (w.invuln > 0) w.invuln = Math.max(0, w.invuln - dt);
+  if (w.tongueT > 0) w.tongueT -= dt;
 
   // 꼬리 효과
   if (nearCam(w.x, w.y, 900)) {
     const st = TIERS[tierOf(w.level)].style, tail = segs[segs.length - 1];
+    if (w.dashT > 0) {
+      for (let k = 0; k < 2; k++) addParticle(tail.x, tail.y, rand(-30, 30), rand(-30, 30), k ? '#fff6c2' : '#ffb347', rand(2, 4.5), 0.4);
+      for (let k = 0; k < 3; k++) {
+        const sg = segs[randInt(0, segs.length - 1)];
+        addParticle(sg.x + rand(-w.r, w.r), sg.y + rand(-w.r, w.r), rand(-40, 40), rand(-40, 40), k ? '#ffffff' : '#ffe066', rand(1.5, 3.5), 0.45);
+      }
+    }
     if (st === 'fire' && Math.random() < 0.5) addParticle(tail.x, tail.y, rand(-30, 30), rand(-30, 30), Math.random() < 0.5 ? '#ff8c1a' : '#ffe14d', rand(2, 5), 0.5);
     if (st === 'dark' && Math.random() < 0.3) addParticle(tail.x, tail.y, rand(-20, 20), rand(-20, 20), Math.random() < 0.5 ? '#ff2e63' : '#5a3d7a', rand(2, 4), 0.6);
     if ((st === 'gold' || st === 'rainbow' || st === 'cosmic' || st === 'silver') && Math.random() < 0.35) {
@@ -992,37 +1046,49 @@ function aiThink(w, dt) {
   ai.timer = step;
 
   const sense = 300 + w.r * 6;
-  let threat = null, td = 1e9, prey = null, pd = 1e9;
+  const look = 90 + w.r * 3 + (w.dashT > 0 ? 140 : 0);     // 앞을 살피는 거리
+  const ca = Math.cos(w.angle), sa = Math.sin(w.angle);
+  let block = null, bd = 1e9, hunter = null, hd2 = 1e9, prey = null, pd = 1e9;
   for (const o of worms) {
     if (o === w || !o.alive) continue;
     const hd = Math.hypot(o.x - w.x, o.y - w.y);
     if (hd > sense + o.segs.length * o.r * 0.55) continue;
-    if (o.level >= w.level) {
-      for (let i = 0; i < o.segs.length; i += 2) {
-        const s = o.segs[i], d = Math.hypot(s.x - w.x, s.y - w.y) - o.r;
-        if (d < td) { td = d; threat = s; }
-      }
-    } else if (hd < sense && o.invuln <= 0 && hd < pd && !(o.isPlayer && w.level - o.level > 10)) { pd = hd; prey = o; }
+    // 앞쪽에 있는 남의 몸통 = 부딪히면 내가 먹힘
+    for (let i = o.level < w.level ? 3 : 1; i < o.segs.length; i += 2) {
+      const sg = o.segs[i], dx = sg.x - w.x, dy = sg.y - w.y;
+      if (dx * ca + dy * sa < -o.r) continue;
+      const d = Math.hypot(dx, dy) - o.r - w.r;
+      if (d < bd) { bd = d; block = sg; }
+    }
+    if (o.level > w.level) { if (hd < hd2) { hd2 = hd; hunter = o; } }
+    else if (o.level < w.level && hd < sense && o.invuln <= 0 && hd < pd && !(o.isPlayer && w.level - o.level > 10)) { pd = hd; prey = o; }
   }
 
   let ta = w.targetAngle;
-  const danger = 130 + w.r * 3;
-  if (threat && td < danger) {
-    ta = Math.atan2(w.y - threat.y, w.x - threat.x);
+  if (block && bd < look) {
+    // 몸통이 왼쪽/오른쪽 어디 있는지 보고 반대로 꺾기
+    const dx = block.x - w.x, dy = block.y - w.y;
+    const side = (ca * dy - sa * dx) > 0 ? -1 : 1;
+    ta = w.angle + side * (Math.PI / 2) * (bd < look * 0.5 ? 1.3 : 0.8);
+    ai.mode = 'avoid';
+  } else if (hunter && hd2 < 160 + w.r * 4) {
+    ta = Math.atan2(w.y - hunter.y, w.x - hunter.x);
+    if (hd2 < 110 + w.r * 3 && Math.random() < 0.5) w.dashWant = true;
     ai.mode = 'flee';
   } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.isPlayer ? 0.3 : 1))) {
     if (ai.mode !== 'chase') ai.chaseT = 0;
     ai.mode = 'chase'; ai.chaseT += step;
     const lead = Math.min(80, pd * 0.4);
     ta = Math.atan2(prey.y + Math.sin(prey.angle) * lead - w.y, prey.x + Math.cos(prey.angle) * lead - w.x);
+    if (pd < 170 && Math.random() < ai.aggro * (prey.isPlayer ? 0.3 : 0.6)) w.dashWant = true;
     if (ai.chaseT > (prey.isPlayer ? 2 : 4.5)) { ai.cool = prey.isPlayer ? 6 : 3.5; ai.mode = 'food'; }
   } else {
     ai.mode = 'food';
-    let best = null, bd = 330 * 330;
+    let best = null, fb = 330 * 330;
     forFoodsNear(w.x, w.y, 330, (f) => {
       const dx = f.x - w.x, dy = f.y - w.y;
       const d2 = (dx * dx + dy * dy) / f.xp;
-      if (d2 < bd) { bd = d2; best = f; }
+      if (d2 < fb) { fb = d2; best = f; }
     });
     if (best) ta = Math.atan2(best.y - w.y, best.x - w.x);
     else { if (Math.random() < 0.15) ai.wander += rand(-1, 1); ta = ai.wander; }
@@ -1068,6 +1134,7 @@ function eatFoods(dt) {
       if (d2 < er * er) {
         f.dead = true; eaten = true;
         gainXp(w, f.xp);
+        if (w.tongueT <= 0.1) { w.tongueT = TONGUE_T; w.tongueA = Math.atan2(f.y - w.y, f.x - w.x); }
         if (w.isPlayer) SFX.eat();
         if (nearCam(f.x, f.y, 50)) burst(f.x, f.y, f.color, 3, 80);
       } else if (magnet && d2 < reach * reach) {
@@ -1078,14 +1145,14 @@ function eatFoods(dt) {
   if (eaten) foods = foods.filter((f) => !f.dead);
 }
 
-// 머리(h)가 o의 몸에 닿았는지
-function touches(h, hr, o) {
+// 머리(h)가 o의 몸통·꼬리(머리 제외)에 닿았는지
+function hitsBody(h, hr, o) {
   const segs = o.segs, n = segs.length;
-  for (let i = 0; i < n; i++) {
-    const s = segs[i], rr = hr + (i / n < 0.65 ? o.r : o.r * 0.7);
-    const dx = s.x - h.x; if (dx > rr || dx < -rr) continue;
-    const dy = s.y - h.y; if (dy > rr || dy < -rr) continue;
-    if (dx * dx + dy * dy < rr * rr) return s;
+  for (let i = 2; i < n; i++) {
+    const sg = segs[i], rr = hr + (i / n < 0.65 ? o.r : o.r * 0.7);
+    const dx = sg.x - h.x; if (dx > rr || dx < -rr) continue;
+    const dy = sg.y - h.y; if (dy > rr || dy < -rr) continue;
+    if (dx * dx + dy * dy < rr * rr) return sg;
   }
   return null;
 }
@@ -1098,6 +1165,8 @@ function bounce(w, c) {
   if (w.isPlayer || nearCam(w.x, w.y, 0)) { SFX.bump(); burst(c.x, c.y, '#ffffff', 4, 90); }
 }
 
+// 규칙: 머리끼리 → 레벨 높은 뱀이 잡아먹음(같으면 튕김)
+//       머리가 남의 몸통·꼬리에 → 부딪힌 뱀이 먹힘 (레벨 상관없이)
 function collide() {
   const n = worms.length;
   for (let i = 0; i < n; i++) {
@@ -1107,18 +1176,24 @@ function collide() {
       const ext = A.segs.length * A.r * 0.55 + B.segs.length * B.r * 0.55 + A.r + B.r;
       const dx = A.x - B.x, dy = A.y - B.y;
       if (dx > ext || dx < -ext || dy > ext || dy < -ext) continue;
-      let hitter = A, other = B, c = touches(A, A.r * 0.85, B);
-      if (!c) { hitter = B; other = A; c = touches(B, B.r * 0.85, A); }
-      if (!c) continue;
-      if (A.level === B.level) { bounce(hitter, c); continue; }
-      const winner = A.level > B.level ? A : B, loser = winner === A ? B : A;
-      if (loser.invuln > 0) { bounce(hitter, c); continue; }
-      eatWorm(winner, loser);
+
+      const hr = (A.r + B.r) * 0.9;
+      if (dx * dx + dy * dy < hr * hr) {
+        if (A.level === B.level) { bounce(A, B); bounce(B, A); continue; }
+        const winner = A.level > B.level ? A : B, loser = winner === A ? B : A;
+        if (loser.invuln > 0) { bounce(loser, winner); continue; }
+        eatWorm(winner, loser, 'head');
+        continue;
+      }
+      let c = hitsBody(A, A.r * 0.8, B);
+      if (c) { if (A.invuln > 0) bounce(A, c); else eatWorm(B, A, 'body'); continue; }
+      c = hitsBody(B, B.r * 0.8, A);
+      if (c) { if (B.invuln > 0) bounce(B, c); else eatWorm(A, B, 'body'); }
     }
   }
 }
 
-function eatWorm(winner, loser) {
+function eatWorm(winner, loser, how) {
   loser.alive = false;
   winner.kills++;
   const P = palOf(loser);
@@ -1130,13 +1205,13 @@ function eatWorm(winner, loser) {
   gainXp(winner, 4 + loser.level * 3);
   if (winner.isPlayer) {
     SFX.gulp();
-    floatText(loser.x, loser.y, `냠! Lv.${loser.level} ${loser.name}`, '#6dff8a');
+    floatText(loser.x, loser.y, how === 'body' ? `쾅! Lv.${loser.level} ${loser.name} 잡았다!` : `냠! Lv.${loser.level} ${loser.name}`, '#6dff8a');
   }
-  if (loser.isPlayer) playerDied(winner);
+  if (loser.isPlayer) playerDied(winner, how);
 }
 
-function playerDied(by) {
-  killer = by;
+function playerDied(by, how) {
+  killer = by; killHow = how;
   SFX.die();
   const P = palOf(player);
   burst(player.x, player.y, P.a, 50, 320);
@@ -1166,6 +1241,7 @@ function updatePlayerInput() {
     if (dx * dx + dy * dy > 64) player.targetAngle = Math.atan2(dy, dx);
   }
   player.look = player.targetAngle;
+  if (input.dash) { input.dash = false; player.dashWant = true; }
 }
 
 function update(dt) {
@@ -1226,34 +1302,130 @@ function update(dt) {
 /* =========================================================
    그리기
    ========================================================= */
+// 우주 배경: 성운(미리 그려둔 무늬) + 행성 + 별 3겹 (멀수록 천천히 움직여 원근감)
+let nebulaPat = null, planets = null;
+function makeNebula() {
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const blobs = [['#7b2ff7', 0.22], ['#2f6bff', 0.2], ['#ff3fa4', 0.14], ['#00d1ff', 0.12], ['#9d4edd', 0.18], ['#ff7b54', 0.08]];
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const [col, al] of blobs) {
+    for (let k = 0; k < 2; k++) {
+      const x = rnd() * S, y = rnd() * S, r = 180 + rnd() * 260;
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+        const [rr, gg, bb] = hexRgb(col);
+        gr.addColorStop(0, `rgba(${rr},${gg},${bb},${al})`); gr.addColorStop(1, `rgba(${rr},${gg},${bb},0)`);
+        g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+      }
+    }
+  }
+  return ctx.createPattern(c, 'repeat');
+}
+function makePlanet(size, c1, c2, ring) {
+  const c = document.createElement('canvas'); c.width = c.height = Math.ceil(size * 2.8);
+  const g = c.getContext('2d'), m = c.width / 2;
+  const ringArc = (from, to) => { g.strokeStyle = 'rgba(255,230,190,0.45)'; g.lineWidth = size * 0.12; g.beginPath(); g.ellipse(m, m, size * 1.3, size * 0.34, -0.35, from, to); g.stroke(); };
+  if (ring) ringArc(Math.PI, TAU);                      // 고리 뒤쪽
+  g.save(); g.beginPath(); g.arc(m, m, size, 0, TAU); g.clip();
+  const gr = g.createRadialGradient(m - size * 0.35, m - size * 0.35, size * 0.1, m, m, size);
+  gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+  g.fillStyle = gr; g.fillRect(m - size, m - size, size * 2, size * 2);
+  g.fillStyle = 'rgba(255,255,255,0.12)';
+  for (let k = -2; k <= 2; k++) g.fillRect(m - size, m + k * size * 0.3, size * 2, size * 0.07);
+  g.restore();
+  if (ring) ringArc(0, Math.PI);                         // 고리 앞쪽
+  return c;
+}
+const hash32 = (a) => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+function drawSpace() {
+  const g = ctx;
+  const bg = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
+  bg.addColorStop(0, '#16123a'); bg.addColorStop(1, '#05040f');
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+
+  if (!nebulaPat) {
+    nebulaPat = makeNebula();
+    planets = [
+      { c: makePlanet(70, '#ffb38a', '#7a2e5c', true), fx: 0.18, fy: 0.22, f: 0.05 },
+      { c: makePlanet(36, '#9fe8ff', '#1d3a8a', false), fx: 0.85, fy: 0.7, f: 0.08 },
+      { c: makePlanet(22, '#d6ff9f', '#2f7a3a', false), fx: 0.6, fy: 0.12, f: 0.11 },
+    ];
+  }
+  const z = cam.z;
+  // 성운
+  const nx = -(cam.x * z * 0.12) % 1024, ny = -(cam.y * z * 0.12) % 1024;
+  g.save(); g.translate(nx, ny); g.fillStyle = nebulaPat; g.fillRect(-nx - 1024, -ny - 1024, W + 2048, H + 2048); g.restore();
+  // 행성 (아주 천천히 움직임)
+  for (const pl of planets) {
+    const px = W * pl.fx - cam.x * z * pl.f, py = H * pl.fy - cam.y * z * pl.f;
+    const span = Math.max(W, H) * 1.6;
+    const qx = ((px % span) + span) % span - pl.c.width / 2, qy = ((py % span) + span) % span - pl.c.height / 2;
+    if (qx < W && qy < H) { g.globalAlpha = 0.5; g.drawImage(pl.c, qx, qy); g.globalAlpha = 1; }
+  }
+  // 별 3겹
+  const T = 360;
+  const layers = [[0.15, 14, 0.9, '#9fb4ff'], [0.35, 10, 1.4, '#ffffff'], [0.65, 6, 2.0, '#fff3c4']];
+  for (let L = 0; L < layers.length; L++) {
+    const [f, count, size, col] = layers[L];
+    const ox = -cam.x * z * f, oy = -cam.y * z * f;
+    const tx0 = Math.floor(-ox / T), ty0 = Math.floor(-oy / T);
+    g.fillStyle = col;
+    for (let tx = tx0; tx <= tx0 + Math.ceil(W / T); tx++) {
+      for (let ty = ty0; ty <= ty0 + Math.ceil(H / T); ty++) {
+        const base = (tx * 73856093) ^ (ty * 19349663) ^ (L * 83492791);
+        for (let k = 0; k < count; k++) {
+          const sx = ox + (tx + hash32(base + k * 3)) * T, sy = oy + (ty + hash32(base + k * 3 + 1)) * T;
+          const tw = hash32(base + k * 3 + 2);
+          g.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time * (1 + tw * 3) + tw * 50));
+          const sz = size * (0.6 + tw * 0.8);
+          g.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+          if (L === 2 && tw > 0.85) { g.fillRect(sx - sz * 2, sy - 0.4, sz * 4, 0.8); g.fillRect(sx - 0.4, sy - sz * 2, 0.8, sz * 4); }
+        }
+      }
+    }
+  }
+  g.globalAlpha = 1;
+}
+
 function render() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  ctx.fillStyle = '#070c09';
-  ctx.fillRect(0, 0, W, H);
+  drawSpace();
 
   const z = cam.z;
   const view = { x0: cam.x - W / 2 / z, x1: cam.x + W / 2 / z, y0: cam.y - H / 2 / z, y1: cam.y + H / 2 / z };
   ctx.save();
   ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-cam.x, -cam.y);
 
-  // 땅
+  // 놀이 구역: 은은한 격자 + 바깥은 어둡게 + 빛나는 경계 링
   ctx.save();
   ctx.beginPath(); ctx.arc(0, 0, WORLD_R, 0, TAU);
-  ctx.fillStyle = '#13241a'; ctx.fill();
+  ctx.fillStyle = 'rgba(70,60,160,0.10)'; ctx.fill();
   ctx.clip();
-  const gs = 64;
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  const gs = 80;
+  ctx.fillStyle = 'rgba(160,170,255,0.10)';
   for (let gx = Math.floor(view.x0 / gs) * gs; gx < view.x1 + gs; gx += gs) {
     for (let gy = Math.floor(view.y0 / gs) * gs; gy < view.y1 + gs; gy += gs) {
       const off = (Math.round(gx / gs) & 1) ? gs / 2 : 0;
-      ctx.beginPath(); ctx.arc(gx, gy + off, 2.2, 0, TAU); ctx.fill();
+      ctx.fillRect(gx - 1.5, gy + off - 1.5, 3, 3);
     }
   }
   ctx.restore();
-  ctx.strokeStyle = 'rgba(255,90,90,0.55)'; ctx.lineWidth = 10;
-  ctx.setLineDash([30, 20]);
-  ctx.beginPath(); ctx.arc(0, 0, WORLD_R, 0, TAU); ctx.stroke();
-  ctx.setLineDash([]);
+  if (Math.hypot(cam.x, cam.y) + Math.hypot(W, H) / z > WORLD_R) {
+    ctx.save();
+    ctx.beginPath(); ctx.rect(view.x0 - 10, view.y0 - 10, view.x1 - view.x0 + 20, view.y1 - view.y0 + 20);
+    ctx.arc(0, 0, WORLD_R, 0, TAU, true);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    ctx.restore();
+    const pulse = 0.6 + 0.4 * Math.sin(time * 3);
+    ctx.strokeStyle = `rgba(255,60,180,${0.25 * pulse})`; ctx.lineWidth = 46;
+    ctx.beginPath(); ctx.arc(0, 0, WORLD_R, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = `rgba(120,220,255,${0.8 * pulse})`; ctx.lineWidth = 8;
+    ctx.setLineDash([60, 30]); ctx.lineDashOffset = -time * 80;
+    ctx.beginPath(); ctx.arc(0, 0, WORLD_R, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   // 먹이
   for (const f of foods) {
@@ -1380,6 +1552,9 @@ let hudTick = 0;
 function setHudVisible(v) { hud.classList.toggle('hidden', !v); }
 function updateHud(dt) {
   if (!player || !player.alive) return;
+  const cool = player.dashCD > 0;
+  dashBtn.classList.toggle('cool', cool);
+  if (cool) dashBtn.style.setProperty('--p', ((1 - player.dashCD / DASH_CD_PLAYER) * 100).toFixed(1) + '%');
   hudTick -= dt;
   if (hudTick > 0) return;
   hudTick = 0.1;
@@ -1424,7 +1599,9 @@ function showGameOver() {
   const tier = tierOf(peakLevel);
   const secs = Math.round(time - playStart);
   $('overMsg').innerHTML = killer
-    ? `<span style="color:#ff5a5a">Lv.${killer.level} ${esc(killer.name)}</span>에게 잡아먹혔어요`
+    ? (killHow === 'body'
+      ? `<span style="color:#ff5a5a">Lv.${killer.level} ${esc(killer.name)}</span>의 몸에 부딪혔어요`
+      : `<span style="color:#ff5a5a">Lv.${killer.level} ${esc(killer.name)}</span>에게 머리를 먹혔어요`)
     : '먹혔어요';
   $('stLv').textContent = 'Lv.' + peakLevel;
   $('stTier').textContent = `${TIERS[tier].emoji}`;
@@ -1504,7 +1681,8 @@ function renderSwatches() {
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (isTouch) {
   document.body.classList.add('touch');
-  $('hint').textContent = '화면을 누르고 끌어서 이동';
+  $('dashBtn').classList.remove('hidden');
+  $('hint').textContent = '화면을 누르고 끌어서 이동 · ⚡ = 순간 부스터';
 }
 setTimeout(() => $('hint').classList.add('hidden'), 9000);
 
@@ -1543,13 +1721,22 @@ cv.addEventListener('touchcancel', touchEnd);
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
-cv.addEventListener('mousedown', () => ensureAudio());
+cv.addEventListener('mousedown', (e) => { ensureAudio(); if (e.button === 0) input.dash = true; });
+const dashBtn = $('dashBtn');
+const pressDash = (e) => { e.preventDefault(); input.dash = true; dashBtn.classList.add('go'); };
+const releaseDash = (e) => { e.preventDefault(); dashBtn.classList.remove('go'); ensureAudio(); };
+dashBtn.addEventListener('touchstart', pressDash, { passive: false });
+dashBtn.addEventListener('touchend', releaseDash, { passive: false });
+dashBtn.addEventListener('touchcancel', releaseDash, { passive: false });
+dashBtn.addEventListener('mousedown', pressDash);
+dashBtn.addEventListener('mouseup', releaseDash);
 
 const STEER_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'];
 window.addEventListener('keydown', (e) => {
   if (e.target && e.target.id === 'nameInput') { if (e.key === 'Enter') startGame(); return; }
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (STEER_KEYS.includes(k)) { input.keys[k] = true; input.mode = 'key'; e.preventDefault(); }
+  if (k === ' ' && !e.repeat) { input.dash = true; e.preventDefault(); }
   if (k === 'Enter' && state === 'over') startGame();
 });
 window.addEventListener('keyup', (e) => {
