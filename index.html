@@ -70,6 +70,18 @@
   #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 13px; color: var(--muted);
     background: var(--panel); padding: 6px 12px; border-radius: 20px; pointer-events: none; white-space: nowrap; }
 
+  #roomPanel { top: 60px; left: 50%; transform: translateX(-50%); padding: 5px 12px; font-size: 14px; white-space: nowrap; }
+  #roomPanel b { color: var(--yellow); font-weight: normal; }
+  body.touch #roomPanel { top: auto; bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 13px; }
+
+  #multiBox { background: rgba(255,255,255,.05); border-radius: 14px; padding: 12px 14px; margin-top: 10px; }
+  #multiBox .btn { font-size: 18px; padding: 10px; }
+  #codeInput { width: 110px; font-family: inherit; font-size: 22px; letter-spacing: 4px; text-align: center; padding: 6px 8px; border-radius: 12px;
+    border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--text); outline: none; user-select: text; -webkit-user-select: text; }
+  #codeInput:focus { border-color: var(--accent); }
+  #netStatus { text-align: center; font-size: 14px; color: var(--muted); margin-top: 8px; min-height: 18px; }
+  #netStatus.err { color: var(--red); }
+
   #toast { position: fixed; top: 22%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;
     opacity: 0; transition: opacity .25s, transform .25s; text-shadow: 0 3px 10px rgba(0,0,0,.6); }
   #toast.show { opacity: 1; transform: translate(-50%, -60%); }
@@ -150,6 +162,7 @@
   <button id="dashBtn" class="round-btn hidden" aria-label="부스터">⚡</button>
   <button id="musicBtn" class="round-btn" aria-label="음악 켜기/끄기">🎵</button>
   <button id="muteBtn" class="round-btn" aria-label="소리 켜기/끄기">🔊</button>
+  <div id="roomPanel" class="panel hidden"></div>
   <div id="hint">마우스로 이동 · 클릭/스페이스 = ⚡부스터</div>
 </div>
 <div id="toast"></div>
@@ -178,7 +191,18 @@
     <div class="evo-title">✨ 진화 단계</div>
     <div class="evo" id="evo"></div>
     <div class="btns">
-      <button class="btn" id="startBtn">시작하기 ▶</button>
+      <button class="btn" id="startBtn">혼자 하기 ▶</button>
+    </div>
+    <div id="multiBox">
+      <div class="evo-title" style="margin-top:0">🌐 온라인 대전 (최대 8명)</div>
+      <div class="btns">
+        <button class="btn" id="hostBtn">방 만들기</button>
+      </div>
+      <div class="row" style="margin:10px 0 0; justify-content:center">
+        <input id="codeInput" inputmode="numeric" maxlength="4" placeholder="1234" autocomplete="off">
+        <button class="btn" id="joinBtn" style="flex:0 1 auto; padding:10px 18px">방 들어가기</button>
+      </div>
+      <div id="netStatus"></div>
     </div>
     <div class="btns" style="margin-top:10px">
       <a class="btn ghost" href="https://family-games-hub.onrender.com/">🏠 게임 모음으로</a>
@@ -254,10 +278,10 @@ const DRAGONISH = new Set(['dragon', 'silver', 'fire', 'dark', 'rainbow', 'gold'
 const GLOWING = new Set(['silver', 'fire', 'dark', 'rainbow', 'gold', 'cosmic']);
 const WINGED = GLOWING;  // 은빛 용부터 날개
 const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
-// Lv.30까지는 쑥쑥, 그 뒤로는 천천히 자라다 멈춤 (맵보다 커지지 않게)
+// 원작처럼 굵기보다 길이가 쭉쭉 자람 (레벨이 오를수록 계속 길어짐, 굵기는 Lv.30 뒤로 천천히)
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
-const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
-const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
+const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.55 : 25.95 + 16 * grow30(L));
+const targetLen = (L) => (L <= 30 ? Math.round(10 + L * 4.5) : Math.min(520, Math.round(145 + (L - 30) * 1.3)));
 const PLAYER_SPEED = 330;
 const TONGUE_T = 0.3;  // 먹이 먹을 때 혀 내미는 시간
 const DASH_TIME = 0.55, DASH_MULT = 2.1, DASH_CD_PLAYER = 3, DASH_CD_AI = 5;
@@ -823,7 +847,7 @@ function drawHeadFront(g, w, tier, st, P, r, t) {
    ========================================================= */
 let state = 'menu';            // menu | play | over
 let worms = [], foods = [], particles = [], texts = [];
-let player = null, nextId = 1, time = 0, playStart = 0, deadTimer = 0, spawnTimer = 0;
+let player = null, nextId = 1, nextFoodId = 1, time = 0, playStart = 0, deadTimer = 0, spawnTimer = 0;
 let cam = { x: 0, y: 0, z: 1 }, attractTarget = null, attractTimer = 0;
 let killer = null, killHow = 'head', peakLevel = 1;
 let selPal = store.get('worm.pal', 0);
@@ -838,12 +862,12 @@ function randomPoint(margin = 0.97) {
 function makeWorm(o) {
   const level = o.level || 1;
   const w = {
-    id: nextId++, name: o.name, isPlayer: !!o.isPlayer, pal: o.pal != null ? o.pal : randInt(0, 3),
+    id: nextId++, name: o.name, isPlayer: !!o.isPlayer, human: !!(o.isPlayer || o.human), remote: o.remote || null, pal: o.pal != null ? o.pal : randInt(0, 3),
     level, xp: o.xp || 0, score: 0, kills: 0, alive: true,
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
     r: radiusOf(level), invuln: o.invuln || 0, dashT: 0, dashCD: 0, dashWant: false,
     segs: [],
-    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(250, 290), chaseT: 0, cool: 0 },
+    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.15, 0.4), speed: rand(230, 270), chaseT: 0, cool: 0 },
   };
   w.targetAngle = w.angle;
   const sp = w.r * 0.55, len = targetLen(level);
@@ -861,7 +885,7 @@ function spawnAI(level) {
   let p, tries = 0;
   do {
     p = randomPoint(0.88); tries++;
-    const okPlayer = !player || !player.alive || Math.hypot(p.x - player.x, p.y - player.y) > 1500;
+    const okPlayer = worms.every((w) => !w.human || !w.alive || Math.hypot(p.x - w.x, p.y - w.y) > 1500);
     const okOthers = worms.every((w) => Math.hypot(p.x - w.x, p.y - w.y) > 220);
     if (okPlayer && okOthers) break;
   } while (tries < 40);
@@ -873,7 +897,8 @@ function spawnAI(level) {
 
 // 새로 나타나는 지렁이 레벨: 내 레벨 주변 (작은 것 + 비슷한 것 + 큰 것)
 function aiLevelForSpawn() {
-  const pL = player && player.alive ? player.level : randInt(1, 8);
+  const humans = worms.filter((w) => w.human && w.alive);
+  const pL = humans.length ? humans[randInt(0, humans.length - 1)].level : randInt(1, 8);
   const r = Math.random();
   let L;
   if (r < 0.5) L = pL - randInt(1, 5);
@@ -885,10 +910,12 @@ function aiLevelForSpawn() {
 function spawnFood(x, y, opts = {}) {
   if (foods.length >= FOOD_MAX) return;
   const big = opts.big != null ? opts.big : Math.random() < 0.08;
-  foods.push({
-    x, y, r: opts.r || (big ? 10 : rand(4.5, 6.5)), xp: opts.xp || (big ? 3 : 1),
+  const f = {
+    id: nextFoodId++, x, y, r: opts.r || (big ? 10 : rand(4.5, 6.5)), xp: opts.xp || (big ? 3 : 1),
     color: opts.color || FOOD_COLORS[randInt(0, FOOD_COLORS.length - 1)], phase: Math.random() * TAU,
-  });
+  };
+  foods.push(f);
+  if (net && net.role === 'host') netFoodAdded(f);
 }
 
 function initWorld(withPlayer) {
@@ -975,7 +1002,7 @@ function showToast(html, ms) {
    ========================================================= */
 function moveWorm(w, dt) {
   w.r += (radiusOf(w.level) - w.r) * Math.min(1, dt * 3);
-  const turnRate = (w.isPlayer ? 9 : 7) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
+  const turnRate = (w.human ? 9 : 7) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
   w.angle += clamp(angDiff(w.targetAngle, w.angle), -turnRate * dt, turnRate * dt);
 
   if (w.dashCD > 0) w.dashCD -= dt;
@@ -983,11 +1010,11 @@ function moveWorm(w, dt) {
   if (w.dashWant) {
     w.dashWant = false;
     if (w.dashCD <= 0) {
-      w.dashT = DASH_TIME; w.dashCD = w.isPlayer ? DASH_CD_PLAYER : DASH_CD_AI;
+      w.dashT = DASH_TIME; w.dashCD = w.human ? DASH_CD_PLAYER : DASH_CD_AI;
       if (w.isPlayer) SFX.dash();
     }
   }
-  const sp = (w.isPlayer ? PLAYER_SPEED : w.ai.speed) * (w.dashT > 0 ? DASH_MULT : 1);
+  const sp = (w.human ? PLAYER_SPEED : w.ai.speed) * (w.dashT > 0 ? DASH_MULT : 1);
   w.x += Math.cos(w.angle) * sp * dt;
   w.y += Math.sin(w.angle) * sp * dt;
 
@@ -998,6 +1025,13 @@ function moveWorm(w, dt) {
     w.angle += angDiff(Math.atan2(-w.y, -w.x), w.angle) * 0.15;
   }
 
+  bodyFollow(w);
+  if (w.invuln > 0) w.invuln = Math.max(0, w.invuln - dt);
+  if (w.tongueT > 0) w.tongueT -= dt;
+  tailFx(w);
+}
+
+function bodyFollow(w) {
   const segs = w.segs;
   segs[0].x = w.x; segs[0].y = w.y;
   const gap = w.r * 0.55;
@@ -1008,11 +1042,11 @@ function moveWorm(w, dt) {
   }
   const tl = targetLen(w.level);
   if (segs.length < tl) { const last = segs[segs.length - 1]; segs.push({ x: last.x, y: last.y }); }
+}
 
-  if (w.invuln > 0) w.invuln = Math.max(0, w.invuln - dt);
-  if (w.tongueT > 0) w.tongueT -= dt;
-
-  // 꼬리 효과
+// 꼬리 효과
+function tailFx(w) {
+  const segs = w.segs;
   if (nearCam(w.x, w.y, 900)) {
     const st = TIERS[tierOf(w.level)].style, tail = segs[segs.length - 1];
     if (w.dashT > 0) {
@@ -1042,11 +1076,11 @@ function aiThink(w, dt) {
   if (ai.cool > 0) ai.cool -= dt;
   ai.timer -= dt;
   if (ai.timer > 0) return;
-  const step = 0.12 + Math.random() * 0.12;
+  const step = 0.16 + Math.random() * 0.16;   // 생각하는 간격 (길수록 둔함)
   ai.timer = step;
 
   const sense = 300 + w.r * 6;
-  const look = 90 + w.r * 3 + (w.dashT > 0 ? 140 : 0);     // 앞을 살피는 거리
+  const look = 70 + w.r * 2.4 + (w.dashT > 0 ? 120 : 0);   // 앞을 살피는 거리 (짧을수록 잘 부딪힘)
   const ca = Math.cos(w.angle), sa = Math.sin(w.angle);
   let block = null, bd = 1e9, hunter = null, hd2 = 1e9, prey = null, pd = 1e9;
   for (const o of worms) {
@@ -1061,7 +1095,7 @@ function aiThink(w, dt) {
       if (d < bd) { bd = d; block = sg; }
     }
     if (o.level > w.level) { if (hd < hd2) { hd2 = hd; hunter = o; } }
-    else if (o.level < w.level && hd < sense && o.invuln <= 0 && hd < pd && !(o.isPlayer && w.level - o.level > 10)) { pd = hd; prey = o; }
+    else if (o.level < w.level && hd < sense && o.invuln <= 0 && hd < pd && !(o.human && w.level - o.level > 10)) { pd = hd; prey = o; }
   }
 
   let ta = w.targetAngle;
@@ -1075,13 +1109,13 @@ function aiThink(w, dt) {
     ta = Math.atan2(w.y - hunter.y, w.x - hunter.x);
     if (hd2 < 110 + w.r * 3 && Math.random() < 0.5) w.dashWant = true;
     ai.mode = 'flee';
-  } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.isPlayer ? 0.3 : 1))) {
+  } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.human ? 0.3 : 1))) {
     if (ai.mode !== 'chase') ai.chaseT = 0;
     ai.mode = 'chase'; ai.chaseT += step;
     const lead = Math.min(80, pd * 0.4);
     ta = Math.atan2(prey.y + Math.sin(prey.angle) * lead - w.y, prey.x + Math.cos(prey.angle) * lead - w.x);
-    if (pd < 170 && Math.random() < ai.aggro * (prey.isPlayer ? 0.3 : 0.6)) w.dashWant = true;
-    if (ai.chaseT > (prey.isPlayer ? 2 : 4.5)) { ai.cool = prey.isPlayer ? 6 : 3.5; ai.mode = 'food'; }
+    if (pd < 150 && Math.random() < ai.aggro * (prey.human ? 0.15 : 0.5)) w.dashWant = true;
+    if (ai.chaseT > (prey.human ? 1.5 : 4.5)) { ai.cool = prey.human ? 8 : 3.5; ai.mode = 'food'; }
   } else {
     ai.mode = 'food';
     let best = null, fb = 330 * 330;
@@ -1126,13 +1160,14 @@ function eatFoods(dt) {
   let eaten = false;
   for (const w of worms) {
     if (!w.alive) continue;
-    const magnet = w.isPlayer ? 34 + w.r : 0;
+    const magnet = w.human ? 34 + w.r : 0;
     const reach = w.r + 12 + magnet;
     forFoodsNear(w.x, w.y, reach + 12, (f) => {
       const dx = f.x - w.x, dy = f.y - w.y;
       const d2 = dx * dx + dy * dy, er = w.r + f.r;
       if (d2 < er * er) {
         f.dead = true; eaten = true;
+        if (net && net.role === 'host') netFoodEaten(f);
         gainXp(w, f.xp);
         if (w.tongueT <= 0.1) { w.tongueT = TONGUE_T; w.tongueA = Math.atan2(f.y - w.y, f.x - w.x); }
         if (w.isPlayer) SFX.eat();
@@ -1160,7 +1195,7 @@ function hitsBody(h, hr, o) {
 function bounce(w, c) {
   const a = Math.atan2(w.y - c.y, w.x - c.x);
   w.angle = a;
-  if (!w.isPlayer) { w.targetAngle = a; w.ai.wander = a; }
+  if (!w.human) { w.targetAngle = a; w.ai.wander = a; }
   w.x += Math.cos(a) * 6; w.y += Math.sin(a) * 6;
   if (w.isPlayer || nearCam(w.x, w.y, 0)) { SFX.bump(); burst(c.x, c.y, '#ffffff', 4, 90); }
 }
@@ -1208,6 +1243,10 @@ function eatWorm(winner, loser, how) {
     floatText(loser.x, loser.y, how === 'body' ? `쾅! Lv.${loser.level} ${loser.name} 잡았다!` : `냠! Lv.${loser.level} ${loser.name}`, '#6dff8a');
   }
   if (loser.isPlayer) playerDied(winner, how);
+  if (net && net.role === 'host') {
+    if (winner.remote) netSend(winner.remote, { t: 'kill', name: loser.name, lv: loser.level, how, x: Math.round(loser.x), y: Math.round(loser.y) });
+    if (loser.remote) netSend(loser.remote, { t: 'dead', name: winner.name, lv: winner.level, how });
+  }
 }
 
 function playerDied(by, how) {
@@ -1249,7 +1288,7 @@ function update(dt) {
   updatePlayerInput();
   for (const w of worms) {
     if (!w.alive) continue;
-    if (!w.isPlayer) aiThink(w, dt);
+    if (!w.human) aiThink(w, dt);
     moveWorm(w, dt);
   }
   eatFoods(dt);
@@ -1258,12 +1297,16 @@ function update(dt) {
   if (player && !player.alive) worms = worms.filter((w) => w !== player);
 
   // 지렁이 / 먹이 보충
-  const aiCount = worms.filter((w) => !w.isPlayer).length;
+  const aiCount = worms.filter((w) => !w.human).length;
   spawnTimer -= dt;
   if (aiCount < AI_COUNT && spawnTimer <= 0) { spawnAI(aiLevelForSpawn()); spawnTimer = 0.25; }
   let need = FOOD_COUNT - foods.length;
   for (let k = 0; k < Math.min(need, 10); k++) { const p = randomPoint(); spawnFood(p.x, p.y); }
+  updateFx(dt);
+}
 
+// 파티클 · 글자 · 카메라 · 게임오버 타이머 (방장/참가자 공통)
+function updateFx(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.life -= dt;
@@ -1286,11 +1329,11 @@ function update(dt) {
   const k = Math.min(1, dt * 6);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
   const base = clamp(Math.min(W, H) / 650, 0.6, 0.9);
-  const zt = base * clamp(1 - (camR - 10) * 0.0145, 0.5, 1);
+  const zt = base * clamp(1 - (camR - 10) * 0.022, 0.5, 1);
   cam.z += (zt - cam.z) * Math.min(1, dt * 2);
 
   if (state === 'play') {
-    if (player.alive) {
+    if (player && player.alive) {
       peakLevel = Math.max(peakLevel, player.level);
     } else if (deadTimer > 0) {
       deadTimer -= dt;
@@ -1465,7 +1508,7 @@ function render() {
     if (sx < -100 || sx > W + 100 || sy < -40 || sy > H + 60) continue;
     let col = '#ffffff';
     if (me && !w.isPlayer) col = w.level > me.level ? '#ff5a5a' : w.level < me.level ? '#6dff8a' : '#ffd84d';
-    const label = w.isPlayer ? `${w.name} Lv.${w.level}` : `${w.name} Lv.${w.level}`;
+    const label = w.human && !w.isPlayer ? `🎮 ${w.name} Lv.${w.level}` : `${w.name} Lv.${w.level}`;
     ctx.font = `${w.isPlayer ? 16 : 14}px Jua, sans-serif`;
     ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.strokeText(label, sx, sy);
@@ -1535,6 +1578,7 @@ function drawMini() {
     if (!w.alive || w.isPlayer) continue;
     mctx.fillStyle = w.level > player.level ? '#ff5a5a' : w.level < player.level ? '#6dff8a' : '#ffd84d';
     mctx.beginPath(); mctx.arc(c + w.x * k, c + w.y * k, 3 + w.r * 0.1, 0, TAU); mctx.fill();
+    if (w.human) { mctx.strokeStyle = '#ffffff'; mctx.lineWidth = 2; mctx.stroke(); }
   }
   const vw = W / cam.z * k, vh = H / cam.z * k;
   mctx.strokeStyle = 'rgba(255,255,255,0.35)'; mctx.lineWidth = 2;
@@ -1576,6 +1620,348 @@ function updateHud(dt) {
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* =========================================================
+   온라인 대전 (PeerJS / WebRTC)
+   방장 브라우저가 게임 전체(컴퓨터 지렁이 100마리 포함)를 돌리고,
+   참가자는 방향만 보내고 화면 상태를 받아서 그림
+   ========================================================= */
+const MAX_HUMANS = 8;
+const PEER_PREFIX = 'family-worm-game-';
+const SNAP_DT = 1 / 15;
+let net = null;   // { role: 'host', peer, code, clients: Map } | { role: 'client', peer, conn, code, myId, ... }
+
+function loadPeerJs() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((ok, fail) => {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    s.onload = ok; s.onerror = () => fail(new Error('load'));
+    document.head.appendChild(s);
+  });
+}
+function setNetStatus(msg, err) { const el = $('netStatus'); el.textContent = msg; el.classList.toggle('err', !!err); }
+const myName = () => ($('nameInput').value || '').trim().slice(0, 8) || '나';
+const humanCount = () => worms.filter((w) => w.human && w.alive).length;
+
+function updateRoomPanel() {
+  const el = $('roomPanel');
+  if (!net || state === 'menu') { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const n = net.role === 'host' ? 1 + net.clients.size : net.players || 1;
+  el.innerHTML = `🌐 방 <b>${net.code}</b> · 👥 ${n}/${MAX_HUMANS}`;
+}
+
+function netClose() {
+  if (!net) return;
+  const n = net; net = null;
+  try { n.peer.destroy(); } catch (e) {}
+  updateRoomPanel();
+}
+
+function netSend(conn, msg) { if (conn && conn.open) { try { conn.send(msg); } catch (e) {} } }
+
+// 다른 지렁이와 떨어진 곳에서 출발
+function safeSpawnPoint() {
+  let p, best = null, bd = -1;
+  for (let i = 0; i < 30; i++) {
+    p = randomPoint(0.7);
+    let d = 1e9;
+    for (const w of worms) if (w.alive) d = Math.min(d, Math.hypot(p.x - w.x, p.y - w.y) - w.r * 4);
+    if (d > 500) return p;
+    if (d > bd) { bd = d; best = p; }
+  }
+  return best;
+}
+
+/* ---------- 방장 ---------- */
+async function hostRoom() {
+  ensureAudio();
+  setNetStatus('방 만드는 중…');
+  try { await loadPeerJs(); } catch (e) { setNetStatus('인터넷 연결을 확인해 주세요', true); return; }
+  const tryOpen = (left) => {
+    const code = String(randInt(1000, 9999));
+    const peer = new Peer(PEER_PREFIX + code);
+    peer.on('open', () => {
+      net = { role: 'host', peer, code, clients: new Map(), snapT: 0, foodAdd: [], foodDel: [] };
+      setNetStatus('');
+      startGame();
+      showToast(`<div class="small">🌐 방 코드</div><div class="big">${code}</div><div class="small">친구에게 알려주세요!</div>`, 4000);
+    });
+    peer.on('connection', (conn) => hostAccept(conn));
+    peer.on('error', (err) => {
+      if (err.type === 'unavailable-id' && left > 0) { peer.destroy(); tryOpen(left - 1); return; }
+      if (!net) { setNetStatus('방을 만들지 못했어요. 다시 해 주세요', true); try { peer.destroy(); } catch (e) {} }
+    });
+    peer.on('disconnected', () => { if (net && net.peer === peer) peer.reconnect(); });
+  };
+  tryOpen(4);
+}
+
+function hostAccept(conn) {
+  conn.on('open', () => {
+    if (!net || net.role !== 'host') { conn.close(); return; }
+    if (1 + net.clients.size >= MAX_HUMANS) { netSend(conn, { t: 'full' }); setTimeout(() => conn.close(), 300); return; }
+    const c = { conn, worm: null, known: new Set(), foodAdd: [], foodDel: [], name: '친구', pal: 0 };
+    net.clients.set(conn.peer, c);
+    // PeerJS json 한 번에 16KB까지라 먹이 목록은 나눠서 보냄
+    const all = foods.map((f) => [f.id, Math.round(f.x), Math.round(f.y), +f.r.toFixed(1), f.color, f.xp]);
+    for (let i = 0; i < all.length || i === 0; i += 300) netSend(conn, { t: i ? 'wf' : 'world', code: net.code, foods: all.slice(i, i + 300) });
+    updateRoomPanel();
+  });
+  conn.on('data', (m) => hostOnData(conn, m));
+  const gone = () => {
+    if (!net || net.role !== 'host') return;
+    const c = net.clients.get(conn.peer);
+    if (!c) return;
+    net.clients.delete(conn.peer);
+    if (c.worm && c.worm.alive) {
+      c.worm.alive = false;
+      for (let i = 0; i < c.worm.segs.length; i += 4) { const s = c.worm.segs[i]; spawnFood(s.x, s.y, { xp: 1, big: false }); }
+    }
+    floatTextNearMe(`👋 ${c.name} 나갔어요`);
+    updateRoomPanel();
+  };
+  conn.on('close', gone);
+  conn.on('error', gone);
+}
+
+function floatTextNearMe(text) {
+  showToast(`<div class="small">${esc(text)}</div>`, 1600);
+}
+
+function hostOnData(conn, m) {
+  if (!net || net.role !== 'host' || !m || typeof m !== 'object') return;
+  const c = net.clients.get(conn.peer);
+  if (!c) return;
+  if (m.t === 'join') {
+    if (c.worm && c.worm.alive) return;
+    c.name = String(m.name || '친구').slice(0, 8) || '친구';
+    c.pal = clamp(m.pal | 0, 0, 3);
+    const p = safeSpawnPoint();
+    const w = makeWorm({ name: c.name, human: true, remote: conn, pal: c.pal, level: 1, x: p.x, y: p.y, invuln: 3 });
+    worms.push(w);
+    c.worm = w;
+    netSend(conn, { t: 'spawn', id: w.id });
+    if (state === 'play') floatTextNearMe(`🎮 ${c.name} 들어왔어요!`);
+  } else if (m.t === 'in' && c.worm && c.worm.alive) {
+    if (typeof m.a === 'number' && isFinite(m.a)) { c.worm.targetAngle = m.a; c.worm.look = m.a; }
+    if (m.d) c.worm.dashWant = true;
+  }
+}
+
+function netFoodAdded(f) {
+  if (!net.clients.size) return;
+  net.foodAdd.push([f.id, Math.round(f.x), Math.round(f.y), +f.r.toFixed(1), f.color, f.xp]);
+}
+function netFoodEaten(f) { if (net.clients.size) net.foodDel.push(f.id); }
+
+function hostTick(dt) {
+  net.snapT -= dt;
+  if (net.snapT > 0) return;
+  net.snapT = SNAP_DT;
+  // 지렁이: [id, x, y, 각도×100, 레벨, 색, 상태] 를 한 줄로
+  const ws = [], live = worms.filter((w) => w.alive);
+  for (const w of live) {
+    const flags = (w.dashT > 0 ? 1 : 0) | (w.invuln > 0 ? 2 : 0) | (w.tongueT > 0.15 ? 4 : 0) | (w.human ? 8 : 0);
+    ws.push(w.id, Math.round(w.x), Math.round(w.y), Math.round(w.angle * 100), w.level, w.pal, flags);
+  }
+  const fa = net.foodAdd, fd = net.foodDel;
+  net.foodAdd = []; net.foodDel = [];
+  const players = 1 + net.clients.size;
+  for (const c of net.clients.values()) {
+    c.foodAdd.push(...fa); c.foodDel.push(...fd);
+    const ch = c.conn.dataChannel;
+    if (ch && ch.bufferedAmount > 512 * 1024) continue;   // 느린 연결: 밀린 걸 먼저 보냄
+    let names = null;
+    for (const w of live) if (!c.known.has(w.id)) { (names || (names = {}))[w.id] = w.name; c.known.add(w.id); }
+    const me = c.worm && c.worm.alive ? [c.worm.id, Math.floor(c.worm.xp), c.worm.score, c.worm.kills, Math.round(Math.max(0, c.worm.dashCD) * 10)] : null;
+    netSend(c.conn, { t: 's', w: ws, n: names, fa: c.foodAdd.slice(0, 250), fd: c.foodDel.slice(0, 1500), me, p: players });
+    c.foodAdd = c.foodAdd.slice(250); c.foodDel = c.foodDel.slice(1500);
+  }
+}
+
+/* ---------- 참가자 ---------- */
+async function joinRoom() {
+  ensureAudio();
+  const code = ($('codeInput').value || '').replace(/\D/g, '');
+  if (code.length !== 4) { setNetStatus('방 코드 4자리를 넣어 주세요', true); return; }
+  setNetStatus('들어가는 중…');
+  try { await loadPeerJs(); } catch (e) { setNetStatus('인터넷 연결을 확인해 주세요', true); return; }
+  netClose();
+  const peer = new Peer();
+  const n = { role: 'client', peer, conn: null, code, myId: null, worms: new Map(), lastSnap: 0, inT: 0, lastA: null, players: 1, joined: false };
+  net = n;
+  const fail = (msg) => { if (net !== n) return; netClose(); setNetStatus(msg, true); };
+  const timer = setTimeout(() => { if (net === n && !n.joined) fail('방을 찾을 수 없어요. 코드를 확인해 주세요'); }, 12000);
+  peer.on('open', () => {
+    const conn = peer.connect(PEER_PREFIX + code, { serialization: 'json', reliable: true });
+    n.conn = conn;
+    conn.on('data', (m) => clientOnData(n, m));
+    conn.on('close', () => {
+      if (net !== n) return;
+      clearTimeout(timer);
+      const was = n.joined;
+      netClose();
+      if (was) { showMenu(); setNetStatus('방이 닫혔어요', true); }
+      else setNetStatus('방에 들어가지 못했어요', true);
+    });
+  });
+  peer.on('error', (err) => {
+    clearTimeout(timer);
+    if (err.type === 'peer-unavailable') fail('방을 찾을 수 없어요. 코드를 확인해 주세요');
+    else if (!n.joined) fail('연결에 실패했어요. 다시 해 주세요');
+  });
+}
+
+function clientOnData(n, m) {
+  if (net !== n || !m || typeof m !== 'object') return;
+  if (m.t === 'full') { netClose(); setNetStatus('방이 꽉 찼어요 (최대 8명)', true); return; }
+  if (m.t === 'world') {
+    n.joined = true;
+    worms = []; particles = []; texts = []; player = null; killer = null; attractTarget = null;
+    foods = m.foods.map((a) => ({ id: a[0], x: a[1], y: a[2], r: a[3], color: a[4], xp: a[5], phase: Math.random() * TAU }));
+    n.foodIds = new Map(foods.map((f) => [f.id, f]));
+    setNetStatus('');
+    netSend(n.conn, { t: 'join', name: myName(), pal: selPal });
+    return;
+  }
+  if (m.t === 'wf') {
+    for (const a of m.foods) {
+      if (n.foodIds.has(a[0])) continue;
+      const f = { id: a[0], x: a[1], y: a[2], r: a[3], color: a[4], xp: a[5], phase: Math.random() * TAU };
+      foods.push(f); n.foodIds.set(f.id, f);
+    }
+    return;
+  }
+  if (m.t === 'spawn') {
+    n.myId = m.id; player = null; killer = null; deadTimer = 0; peakLevel = 1;
+    enterPlay();
+    return;
+  }
+  if (m.t === 's') { applySnapshot(n, m); return; }
+  if (m.t === 'kill') {
+    SFX.gulp();
+    floatText(m.x, m.y, m.how === 'body' ? `쾅! Lv.${m.lv} ${m.name} 잡았다!` : `냠! Lv.${m.lv} ${m.name}`, '#6dff8a');
+    return;
+  }
+  if (m.t === 'dead' && player) {
+    player.alive = false;
+    worms = worms.filter((w) => w !== player);
+    n.worms.delete(player.id);
+    n.myId = null;
+    playerDied({ name: m.name, level: m.lv }, m.how);
+  }
+}
+
+function applySnapshot(n, m) {
+  const now = performance.now();
+  const sdt = n.lastSnap ? clamp((now - n.lastSnap) / 1000, 0.03, 0.3) : SNAP_DT;
+  n.lastSnap = now;
+  if (m.p) { n.players = m.p; updateRoomPanel(); }
+
+  // 먹이 변화
+  if (m.fd && m.fd.length) {
+    const del = new Set(m.fd);
+    for (const id of del) {
+      const f = n.foodIds.get(id);
+      if (!f) continue;
+      n.foodIds.delete(id);
+      if (nearCam(f.x, f.y, 50)) burst(f.x, f.y, f.color, 3, 80);
+    }
+    foods = foods.filter((f) => !del.has(f.id));
+  }
+  if (m.fa) for (const a of m.fa) {
+    if (n.foodIds.has(a[0])) continue;
+    const f = { id: a[0], x: a[1], y: a[2], r: a[3], color: a[4], xp: a[5], phase: Math.random() * TAU };
+    foods.push(f); n.foodIds.set(f.id, f);
+  }
+
+  // 지렁이
+  const seen = new Set(), ws = m.w;
+  for (let i = 0; i < ws.length; i += 7) {
+    const id = ws[i], x = ws[i + 1], y = ws[i + 2], a = ws[i + 3] / 100, lv = ws[i + 4], pal = ws[i + 5], fl = ws[i + 6];
+    seen.add(id);
+    let w = n.worms.get(id);
+    if (!w) {
+      w = makeWorm({ name: (m.n && m.n[id]) || (n.names && n.names[id]) || '?', level: lv, x, y, angle: a, pal, human: !!(fl & 8), isPlayer: id === n.myId });
+      w.id = id; w.vx = Math.cos(a) * 270; w.vy = Math.sin(a) * 270;
+      n.worms.set(id, w); worms.push(w);
+      if (id === n.myId) { player = w; cam.x = w.x; cam.y = w.y; }
+    } else {
+      w.vx = (x - w.nx) / sdt; w.vy = (y - w.ny) / sdt;
+      const sp = Math.hypot(w.vx, w.vy);
+      if (sp > 1200) { w.vx = 0; w.vy = 0; }
+    }
+    if (m.n && m.n[id]) w.name = m.n[id];
+    w.nx = x; w.ny = y; w.na = a; w.snapAge = 0;
+    if (w !== player) {
+      if (lv > w.level) w.level = lv;
+      w.dashT = fl & 1 ? 1 : 0;
+      w.invuln = fl & 2 ? 1 : 0;
+      if (fl & 4 && w.tongueT <= 0.1) { w.tongueT = TONGUE_T; w.tongueA = a; }
+    } else {
+      const oldTier = tierOf(w.level), oldLv = w.level;
+      w.invuln = fl & 2 ? 1 : 0;
+      if (lv > oldLv) { w.level = lv; onPlayerLevelUp(oldTier); }
+      if (fl & 4 && w.tongueT <= 0.1) { w.tongueT = TONGUE_T; w.tongueA = a; }
+    }
+  }
+  if (m.n) n.names = Object.assign(n.names || {}, m.n);
+  for (const [id, w] of n.worms) {
+    if (seen.has(id)) continue;
+    n.worms.delete(id);
+    w.alive = false;
+    if (nearCam(w.x, w.y, 100)) burst(w.x, w.y, palOf(w).a, 24, 260);
+  }
+  worms = worms.filter((w) => w.alive);
+
+  if (m.me && player && m.me[0] === player.id) {
+    const [, xp, score, kills, cd] = m.me;
+    if (score > player.score && kills === player.kills) SFX.eat();
+    player.xp = xp; player.score = score; player.kills = kills;
+    player.dashCD = cd / 10;
+  }
+}
+
+function clientUpdate(dt) {
+  time += dt;
+  const n = net;
+  updatePlayerInput();
+  if (player && player.alive) {
+    // 입력 보내기 (방향이 바뀌었거나 부스터)
+    n.inT -= dt;
+    const dash = player.dashWant;
+    if (dash || (n.inT <= 0 && player.targetAngle !== n.lastA)) {
+      netSend(n.conn, { t: 'in', a: +player.targetAngle.toFixed(3), d: dash ? 1 : 0 });
+      n.inT = 0.05; n.lastA = player.targetAngle;
+    }
+  }
+  for (const w of worms) {
+    if (!w.alive) continue;
+    w.snapAge = (w.snapAge || 0) + dt;
+    const lead = Math.min(w.snapAge, 0.25);
+    if (w === player) {
+      // 내 지렁이는 바로 움직이고(답답하지 않게), 방장 쪽 위치로 살살 맞춤
+      moveWorm(w, dt);
+      const tx = w.nx + w.vx * (lead + 0.06), ty = w.ny + w.vy * (lead + 0.06);
+      const ex = tx - w.x, ey = ty - w.y;
+      if (ex * ex + ey * ey > 300 * 300) { w.x = tx; w.y = ty; }
+      else { const k = Math.min(1, dt * 3); w.x += ex * k; w.y += ey * k; }
+      continue;
+    }
+    w.r += (radiusOf(w.level) - w.r) * Math.min(1, dt * 3);
+    const tx = w.nx + w.vx * lead, ty = w.ny + w.vy * lead;
+    const ex = tx - w.x, ey = ty - w.y;
+    if (ex * ex + ey * ey > 400 * 400) { w.x = tx; w.y = ty; }
+    else { const k = Math.min(1, dt * 12); w.x += ex * k; w.y += ey * k; }
+    w.angle += angDiff(w.na, w.angle) * Math.min(1, dt * 12);
+    if (w.tongueT > 0) w.tongueT -= dt;
+    bodyFollow(w);
+    tailFx(w);
+  }
+  updateFx(dt);
+}
+
+/* =========================================================
    화면 전환
    ========================================================= */
 function startGame() {
@@ -1583,7 +1969,24 @@ function startGame() {
   const name = ($('nameInput').value || '').trim();
   store.set('worm.name', name);
   store.set('worm.pal', selPal);
-  initWorld(true);
+  if (net && net.role === 'client') {
+    // 다시 하기: 방장에게 새 지렁이 요청
+    $('overOv').classList.add('hidden');
+    netSend(net.conn, { t: 'join', name: myName(), pal: selPal });
+    return;
+  }
+  if (net && net.role === 'host' && state !== 'menu') {
+    // 방은 그대로 두고 내 지렁이만 새로
+    const p = safeSpawnPoint();
+    player = makeWorm({ name: myName(), isPlayer: true, pal: selPal, level: 1, x: p.x, y: p.y, invuln: 3 });
+    worms.push(player);
+    cam.x = player.x; cam.y = player.y;
+    killer = null; deadTimer = 0; peakLevel = 1;
+  } else initWorld(true);
+  enterPlay();
+}
+
+function enterPlay() {
   state = 'play';
   playStart = time;
   $('startOv').classList.add('hidden');
@@ -1591,6 +1994,7 @@ function startGame() {
   setHudVisible(true);
   hudTick = 0;
   input.touchId = null; input.joy = false;
+  updateRoomPanel();
   showToast(`<div class="small">${TIERS[0].emoji} 아기 지렁이 출발!</div><div class="big">Lv.1</div>`, 1400);
 }
 
@@ -1616,6 +2020,7 @@ function showGameOver() {
 }
 
 function showMenu() {
+  netClose();
   state = 'menu';
   initWorld(false);
   setHudVisible(false);
@@ -1734,6 +2139,7 @@ dashBtn.addEventListener('mouseup', releaseDash);
 const STEER_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'];
 window.addEventListener('keydown', (e) => {
   if (e.target && e.target.id === 'nameInput') { if (e.key === 'Enter') startGame(); return; }
+  if (e.target && e.target.id === 'codeInput') { if (e.key === 'Enter') joinRoom(); return; }
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (STEER_KEYS.includes(k)) { input.keys[k] = true; input.mode = 'key'; e.preventDefault(); }
   if (k === ' ' && !e.repeat) { input.dash = true; e.preventDefault(); }
@@ -1758,6 +2164,9 @@ document.addEventListener('touchend', ensureAudio);
 document.addEventListener('keydown', ensureAudio);
 
 $('startBtn').addEventListener('click', startGame);
+$('hostBtn').addEventListener('click', hostRoom);
+$('joinBtn').addEventListener('click', joinRoom);
+$('codeInput').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); });
 $('againBtn').addEventListener('click', startGame);
 $('menuBtn').addEventListener('click', showMenu);
 $('nameInput').value = store.get('worm.name', '');
@@ -1770,7 +2179,9 @@ let lastT = 0;
 function frame(now) {
   const dt = lastT ? Math.min(0.05, (now - lastT) / 1000) : 0;
   lastT = now;
-  update(dt);
+  if (net && net.role === 'client' && net.joined) clientUpdate(dt);
+  else update(dt);
+  if (net && net.role === 'host') hostTick(dt);
   updateHud(dt);
   render();
   requestAnimationFrame(frame);
