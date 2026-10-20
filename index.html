@@ -202,10 +202,10 @@
 /* =========================================================
    설정
    ========================================================= */
-const WORLD_R = 4000;
-const FOOD_COUNT = 1800;
-const FOOD_MAX = 2600;
-const AI_COUNT = 60;
+const WORLD_R = 4800;
+const FOOD_COUNT = 2600;
+const FOOD_MAX = 3600;
+const AI_COUNT = 100;
 const MAX_LEVEL = 999;
 const TAU = Math.PI * 2;
 
@@ -243,7 +243,7 @@ const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
 const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
 const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
-const PLAYER_SPEED = 320;
+const PLAYER_SPEED = 380;
 
 const FOOD_COLORS = ['#ff5a5a', '#ffd84d', '#6dff8a', '#4dd2ff', '#c98bff', '#ff8fd0', '#ff9f43', '#b6ff4d'];
 const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이', '통통이', '길쭉이', '몽글이', '반짝이', '뭉치', '초코', '콩이',
@@ -252,7 +252,9 @@ const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이
   '김밥', '만두', '떡볶이', '순대', '찐빵', '꿀떡', '약과', '인절미', '송편', '군밤', '고구마', '옥수수', '푸딩', '마카롱',
   '와플', '붕어빵', '사과', '딸기', '포도', '귤이', '복숭아', '수박', '참외', '키위', '레몬', '체리', '바나나', '토끼',
   '다람쥐', '햄찌', '병아리', '오리', '펭귄', '판다', '코알라', '돌돌이', '뱅글이', '쫀득이', '말캉이', '싱싱이',
-  '씩씩이', '용감이', '날쌘돌이', '느림보', '잠꾸러기', '장난꾸러기', '똘똘이', '꾸러기', '왕눈이', '방글이'];
+  '씩씩이', '용감이', '날쌘돌이', '느림보', '잠꾸러기', '장난꾸러기', '똘똘이', '꾸러기', '왕눈이', '방글이',
+  '초롱이', '또롱이', '뽀송이', '보들이', '하늘이', '바다', '산들이', '햇살이', '달님이', '무지개', '꽃님이', '새싹이',
+  '단비', '이슬이', '눈송이', '바람이', '꿀벌', '나비', '개구리', '거북이', '고래'];
 
 /* =========================================================
    유틸
@@ -539,7 +541,7 @@ function makeWorm(o) {
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
     r: radiusOf(level), invuln: o.invuln || 0,
     segs: [],
-    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(245, 280), chaseT: 0, cool: 0 },
+    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(290, 335), chaseT: 0, cool: 0 },
   };
   w.targetAngle = w.angle;
   const sp = w.r * 0.55, len = targetLen(level);
@@ -671,7 +673,7 @@ function showToast(html, ms) {
    ========================================================= */
 function moveWorm(w, dt) {
   w.r += (radiusOf(w.level) - w.r) * Math.min(1, dt * 3);
-  const turnRate = (w.isPlayer ? 8 : 6.3) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
+  const turnRate = (w.isPlayer ? 9 : 7) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
   w.angle += clamp(angDiff(w.targetAngle, w.angle), -turnRate * dt, turnRate * dt);
 
   const sp = w.isPlayer ? PLAYER_SPEED : w.ai.speed;
