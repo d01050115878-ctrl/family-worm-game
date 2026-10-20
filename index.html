@@ -39,8 +39,6 @@
   #hudTier { font-size: 16px; margin-bottom: 4px; }
   .bar { width: 140px; height: 10px; border-radius: 6px; background: rgba(255,255,255,.14); overflow: hidden; }
   .bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #6dff8a, #2bd4a8); transition: width .15s; }
-  .bar.st { height: 6px; margin-top: 4px; }
-  .bar.st i { background: linear-gradient(90deg, #ffd84d, #ff9f43); transition: none; }
   .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
   #boardPanel { top: 12px; right: 12px; padding: 8px 12px; width: 170px; font-size: 13px; }
@@ -54,11 +52,8 @@
     background: rgba(10,18,14,.6); border: 1px solid var(--line); pointer-events: none; }
 
   .round-btn { position: fixed; border: none; color: #fff; font-family: inherit; cursor: pointer; }
-  #boostBtn { right: calc(22px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 92px; height: 92px; border-radius: 50%; font-size: 34px;
-    background: radial-gradient(circle at 35% 30%, rgba(255,216,77,.9), rgba(255,140,40,.85)); box-shadow: 0 4px 14px rgba(0,0,0,.4); touch-action: none; }
   body.touch #mini { right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom)); }
-  body.touch #muteBtn { top: auto; bottom: calc(32px + env(safe-area-inset-bottom)); left: auto; right: calc(128px + env(safe-area-inset-right)); transform: none; }
-  #boostBtn.on { transform: scale(.92); filter: brightness(1.2); }
+  body.touch #muteBtn { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); left: auto; right: calc(16px + env(safe-area-inset-right)); transform: none; }
   #muteBtn { top: 12px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; border-radius: 50%; font-size: 18px;
     background: var(--panel); border: 1px solid var(--line); }
   #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 13px; color: var(--muted);
@@ -136,15 +131,13 @@
     <div>
       <div id="hudTier">아기 지렁이</div>
       <div class="bar"><i id="hudXp"></i></div>
-      <div class="bar st"><i id="hudSt"></i></div>
       <div class="sub"><span id="hudXpTxt">0 / 10</span> · 🍴 <span id="hudKills">0</span>마리</div>
     </div>
   </div>
   <div id="boardPanel" class="panel"><b>🏆 순위</b><ol id="board"></ol></div>
   <canvas id="mini" width="260" height="260"></canvas>
-  <button id="boostBtn" class="round-btn hidden" aria-label="부스터">⚡</button>
   <button id="muteBtn" class="round-btn" aria-label="소리 켜기/끄기">🔊</button>
-  <div id="hint">마우스 방향으로 이동 · 클릭/스페이스 = ⚡부스터</div>
+  <div id="hint">마우스 방향으로 이동 (방향키도 돼요)</div>
 </div>
 <div id="toast"></div>
 
@@ -158,7 +151,7 @@
       <div class="g">🟢 초록 레벨 = 나보다 작아요 → 부딪히면 냠! 잡아먹어요</div>
       <div class="r">🔴 빨간 레벨 = 나보다 커요 → 닿으면 먹혀요! 도망쳐요</div>
       <div class="y">🟡 노란 레벨 = 나와 같아요 → 서로 튕겨나요</div>
-      <div>🕹️ 화면을 누르고 원하는 방향으로 끌면 이동, ⚡ 버튼을 누르면 부스터 (PC: 마우스·스페이스)</div>
+      <div>🕹️ 화면을 누르고 원하는 방향으로 끌면 이동해요 (PC: 마우스·방향키)</div>
     </div>
     <div class="row">
       <label for="nameInput">이름</label>
@@ -209,10 +202,10 @@
 /* =========================================================
    설정
    ========================================================= */
-const WORLD_R = 3200;
-const FOOD_COUNT = 1100;
-const FOOD_MAX = 1600;
-const AI_COUNT = 22;
+const WORLD_R = 4000;
+const FOOD_COUNT = 1800;
+const FOOD_MAX = 2600;
+const AI_COUNT = 60;
 const MAX_LEVEL = 999;
 const TAU = Math.PI * 2;
 
@@ -250,12 +243,16 @@ const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
 const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
 const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
 const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
-const PLAYER_SPEED = 260;
+const PLAYER_SPEED = 320;
 
 const FOOD_COLORS = ['#ff5a5a', '#ffd84d', '#6dff8a', '#4dd2ff', '#c98bff', '#ff8fd0', '#ff9f43', '#b6ff4d'];
 const AI_NAMES = ['꿈틀이', '말랑이', '쭉쭉이', '꼬물이', '미끌이', '통통이', '길쭉이', '몽글이', '반짝이', '뭉치', '초코', '콩이',
   '두부', '망고', '보리', '호떡', '젤리', '팥떡', '구름이', '별이', '방울이', '슝슝이', '먹보', '대장', '번개', '꼬마', '마루',
-  '누룽지', '라면', '감자', '깨비', '단팥', '쿠키', '모찌', '도토리', '솜사탕'];
+  '누룽지', '라면', '감자', '깨비', '단팥', '쿠키', '모찌', '도토리', '솜사탕',
+  '김밥', '만두', '떡볶이', '순대', '찐빵', '꿀떡', '약과', '인절미', '송편', '군밤', '고구마', '옥수수', '푸딩', '마카롱',
+  '와플', '붕어빵', '사과', '딸기', '포도', '귤이', '복숭아', '수박', '참외', '키위', '레몬', '체리', '바나나', '토끼',
+  '다람쥐', '햄찌', '병아리', '오리', '펭귄', '판다', '코알라', '돌돌이', '뱅글이', '쫀득이', '말캉이', '싱싱이',
+  '씩씩이', '용감이', '날쌘돌이', '느림보', '잠꾸러기', '장난꾸러기', '똘똘이', '꾸러기', '왕눈이', '방글이'];
 
 /* =========================================================
    유틸
@@ -526,7 +523,7 @@ let player = null, nextId = 1, time = 0, playStart = 0, deadTimer = 0, spawnTime
 let cam = { x: 0, y: 0, z: 1 }, attractTarget = null, attractTimer = 0;
 let killer = null, peakLevel = 1;
 let selPal = store.get('worm.pal', 0);
-const input = { px: 0, py: 0, boost: false, mode: 'mouse', keys: {},
+const input = { px: 0, py: 0, mode: 'mouse', keys: {},
   touchId: null, ox: 0, oy: 0, joy: false, joyAngle: 0 };
 
 function randomPoint(margin = 0.97) {
@@ -540,9 +537,9 @@ function makeWorm(o) {
     id: nextId++, name: o.name, isPlayer: !!o.isPlayer, pal: o.pal != null ? o.pal : randInt(0, 3),
     level, xp: o.xp || 0, score: 0, kills: 0, alive: true,
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
-    r: radiusOf(level), stamina: 1, boostWant: false, boosting: false, invuln: o.invuln || 0,
+    r: radiusOf(level), invuln: o.invuln || 0,
     segs: [],
-    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(200, 232), chaseT: 0, cool: 0 },
+    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(245, 280), chaseT: 0, cool: 0 },
   };
   w.targetAngle = w.angle;
   const sp = w.r * 0.55, len = targetLen(level);
@@ -674,14 +671,10 @@ function showToast(html, ms) {
    ========================================================= */
 function moveWorm(w, dt) {
   w.r += (radiusOf(w.level) - w.r) * Math.min(1, dt * 3);
-  const turnRate = (w.isPlayer ? 7 : 5.5) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
+  const turnRate = (w.isPlayer ? 8 : 6.3) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
   w.angle += clamp(angDiff(w.targetAngle, w.angle), -turnRate * dt, turnRate * dt);
 
-  const boosting = w.boostWant && w.stamina > 0.02;
-  w.stamina = boosting ? Math.max(0, w.stamina - dt * 0.45) : Math.min(1, w.stamina + dt * 0.22);
-  w.boosting = boosting;
-  const base = w.isPlayer ? PLAYER_SPEED : w.ai.speed;
-  const sp = boosting ? base * 1.75 : base;
+  const sp = w.isPlayer ? PLAYER_SPEED : w.ai.speed;
   w.x += Math.cos(w.angle) * sp * dt;
   w.y += Math.sin(w.angle) * sp * dt;
 
@@ -715,7 +708,6 @@ function moveWorm(w, dt) {
       const col = st === 'gold' ? '#fff8d6' : st === 'silver' ? '#e7f5ff' : st === 'cosmic' ? (Math.random() < 0.5 ? '#ffffff' : '#b197fc') : `hsl(${randInt(0, 359)},90%,70%)`;
       addParticle(s.x + rand(-w.r, w.r), s.y + rand(-w.r, w.r), 0, -20, col, rand(1.5, 3.5), 0.7);
     }
-    if (boosting && Math.random() < 0.6) addParticle(tail.x, tail.y, rand(-20, 20), rand(-20, 20), 'rgba(255,255,255,0.7)', rand(2, 4), 0.35);
   }
 }
 
@@ -746,56 +738,77 @@ function aiThink(w, dt) {
     } else if (hd < sense && o.invuln <= 0 && hd < pd) { pd = hd; prey = o; }
   }
 
-  let ta = w.targetAngle, boost = false;
-  const danger = 110 + w.r * 3;
+  let ta = w.targetAngle;
+  const danger = 130 + w.r * 3;
   if (threat && td < danger) {
     ta = Math.atan2(w.y - threat.y, w.x - threat.x);
-    boost = td < danger * 0.5 && w.stamina > 0.15;
     ai.mode = 'flee';
   } else if (prey && ai.cool <= 0 && (ai.mode === 'chase' || Math.random() < ai.aggro * (prey.isPlayer ? 0.6 : 1))) {
     if (ai.mode !== 'chase') ai.chaseT = 0;
     ai.mode = 'chase'; ai.chaseT += step;
     const lead = Math.min(80, pd * 0.4);
     ta = Math.atan2(prey.y + Math.sin(prey.angle) * lead - w.y, prey.x + Math.cos(prey.angle) * lead - w.x);
-    boost = pd < 260 && w.stamina > 0.5 && Math.random() < ai.aggro;
     if (ai.chaseT > (prey.isPlayer ? 3 : 4.5)) { ai.cool = 3.5; ai.mode = 'food'; }
   } else {
     ai.mode = 'food';
     let best = null, bd = 330 * 330;
-    for (const f of foods) {
-      const dx = f.x - w.x; if (dx > 330 || dx < -330) continue;
-      const dy = f.y - w.y; if (dy > 330 || dy < -330) continue;
+    forFoodsNear(w.x, w.y, 330, (f) => {
+      const dx = f.x - w.x, dy = f.y - w.y;
       const d2 = (dx * dx + dy * dy) / f.xp;
       if (d2 < bd) { bd = d2; best = f; }
-    }
+    });
     if (best) ta = Math.atan2(best.y - w.y, best.x - w.x);
     else { if (Math.random() < 0.15) ai.wander += rand(-1, 1); ta = ai.wander; }
   }
   if (Math.hypot(w.x, w.y) > WORLD_R - 220 - w.r) { ta = Math.atan2(-w.y, -w.x) + rand(-0.4, 0.4); ai.wander = ta; }
   w.targetAngle = ta;
-  w.boostWant = boost;
+}
+
+// 먹이를 128px 칸에 나눠 담아, 근처 칸만 살펴봄
+const CELL = 128;
+const foodGrid = new Map();
+const cellKey = (cx, cy) => (cx + 512) * 1024 + (cy + 512);
+function buildFoodGrid() {
+  foodGrid.clear();
+  for (const f of foods) {
+    const k = cellKey(Math.floor(f.x / CELL), Math.floor(f.y / CELL));
+    let b = foodGrid.get(k);
+    if (!b) { b = []; foodGrid.set(k, b); }
+    b.push(f);
+  }
+}
+function forFoodsNear(x, y, rad, fn) {
+  const x0 = Math.floor((x - rad) / CELL), x1 = Math.floor((x + rad) / CELL);
+  const y0 = Math.floor((y - rad) / CELL), y1 = Math.floor((y + rad) / CELL);
+  for (let cx = x0; cx <= x1; cx++) {
+    for (let cy = y0; cy <= y1; cy++) {
+      const b = foodGrid.get(cellKey(cx, cy));
+      if (b) for (const f of b) if (!f.dead) fn(f);
+    }
+  }
 }
 
 function eatFoods(dt) {
+  buildFoodGrid();
+  let eaten = false;
   for (const w of worms) {
     if (!w.alive) continue;
     const magnet = w.isPlayer ? 34 + w.r : 0;
     const reach = w.r + 12 + magnet;
-    for (let i = foods.length - 1; i >= 0; i--) {
-      const f = foods[i];
-      const dx = f.x - w.x; if (dx > reach || dx < -reach) continue;
-      const dy = f.y - w.y; if (dy > reach || dy < -reach) continue;
+    forFoodsNear(w.x, w.y, reach + 12, (f) => {
+      const dx = f.x - w.x, dy = f.y - w.y;
       const d2 = dx * dx + dy * dy, er = w.r + f.r;
       if (d2 < er * er) {
-        foods[i] = foods[foods.length - 1]; foods.pop();
+        f.dead = true; eaten = true;
         gainXp(w, f.xp);
         if (w.isPlayer) SFX.eat();
         if (nearCam(f.x, f.y, 50)) burst(f.x, f.y, f.color, 3, 80);
       } else if (magnet && d2 < reach * reach) {
         f.x -= dx * dt * 5; f.y -= dy * dt * 5;
       }
-    }
+    });
   }
+  if (eaten) foods = foods.filter((f) => !f.dead);
 }
 
 // 머리(h)가 o의 몸에 닿았는지
@@ -886,7 +899,6 @@ function updatePlayerInput() {
     if (dx * dx + dy * dy > 64) player.targetAngle = Math.atan2(dy, dx);
   }
   player.look = player.targetAngle;
-  player.boostWant = input.boost;
 }
 
 function update(dt) {
@@ -905,9 +917,9 @@ function update(dt) {
   // 지렁이 / 먹이 보충
   const aiCount = worms.filter((w) => !w.isPlayer).length;
   spawnTimer -= dt;
-  if (aiCount < AI_COUNT && spawnTimer <= 0) { spawnAI(aiLevelForSpawn()); spawnTimer = 0.7; }
+  if (aiCount < AI_COUNT && spawnTimer <= 0) { spawnAI(aiLevelForSpawn()); spawnTimer = 0.25; }
   let need = FOOD_COUNT - foods.length;
-  for (let k = 0; k < Math.min(need, 6); k++) { const p = randomPoint(); spawnFood(p.x, p.y); }
+  for (let k = 0; k < Math.min(need, 10); k++) { const p = randomPoint(); spawnFood(p.x, p.y); }
 
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
@@ -1072,7 +1084,6 @@ let hudTick = 0;
 function setHudVisible(v) { hud.classList.toggle('hidden', !v); }
 function updateHud(dt) {
   if (!player || !player.alive) return;
-  $('hudSt').style.width = (player.stamina * 100).toFixed(1) + '%';
   hudTick -= dt;
   if (hudTick > 0) return;
   hudTick = 0.1;
@@ -1108,8 +1119,7 @@ function startGame() {
   $('overOv').classList.add('hidden');
   setHudVisible(true);
   hudTick = 0;
-  input.boost = false; input.touchId = null; input.joy = false;
-  boostBtn.classList.remove('on');
+  input.touchId = null; input.joy = false;
   showToast(`<div class="small">${TIERS[0].emoji} 아기 지렁이 출발!</div><div class="big">Lv.1</div>`, 1400);
 }
 
@@ -1198,14 +1208,11 @@ function renderSwatches() {
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 if (isTouch) {
   document.body.classList.add('touch');
-  $('boostBtn').classList.remove('hidden');
-  $('hint').textContent = '화면을 누르고 끌어서 이동 · ⚡ 버튼 = 부스터';
+  $('hint').textContent = '화면을 누르고 끌어서 이동';
 }
 setTimeout(() => $('hint').classList.add('hidden'), 9000);
 
 cv.addEventListener('mousemove', (e) => { input.px = e.clientX; input.py = e.clientY; input.mode = 'mouse'; });
-cv.addEventListener('mousedown', (e) => { if (e.button === 0) input.boost = true; });
-window.addEventListener('mouseup', () => { input.boost = false; });
 cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // 떠다니는 조이스틱: 화면 아무 데나 누르고 드래그
@@ -1240,29 +1247,20 @@ cv.addEventListener('touchcancel', touchEnd);
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
-const boostBtn = $('boostBtn');
-const boostOn = (e) => { e.preventDefault(); ensureAudio(); input.boost = true; boostBtn.classList.add('on'); };
-const boostOff = (e) => { e.preventDefault(); input.boost = false; boostBtn.classList.remove('on'); };
-boostBtn.addEventListener('touchstart', boostOn, { passive: false });
-boostBtn.addEventListener('touchend', boostOff, { passive: false });
-boostBtn.addEventListener('touchcancel', boostOff, { passive: false });
-boostBtn.addEventListener('mousedown', boostOn);
-boostBtn.addEventListener('mouseup', boostOff);
+cv.addEventListener('mousedown', () => ensureAudio());
 
 const STEER_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd'];
 window.addEventListener('keydown', (e) => {
   if (e.target && e.target.id === 'nameInput') { if (e.key === 'Enter') startGame(); return; }
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (k === ' ') { input.boost = true; e.preventDefault(); }
   if (STEER_KEYS.includes(k)) { input.keys[k] = true; input.mode = 'key'; e.preventDefault(); }
   if (k === 'Enter' && state === 'over') startGame();
 });
 window.addEventListener('keyup', (e) => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-  if (k === ' ') input.boost = false;
   if (STEER_KEYS.includes(k)) input.keys[k] = false;
 });
-window.addEventListener('blur', () => { input.boost = false; input.keys = {}; });
+window.addEventListener('blur', () => { input.keys = {}; });
 
 const muteBtn = $('muteBtn');
 const syncMute = () => { muteBtn.textContent = muted ? '🔇' : '🔊'; };
