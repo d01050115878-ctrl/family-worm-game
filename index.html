@@ -209,11 +209,11 @@
 /* =========================================================
    설정
    ========================================================= */
-const WORLD_R = 2600;
-const FOOD_COUNT = 750;
-const FOOD_MAX = 1100;
+const WORLD_R = 3200;
+const FOOD_COUNT = 1100;
+const FOOD_MAX = 1600;
 const AI_COUNT = 22;
-const MAX_LEVEL = 30;
+const MAX_LEVEL = 999;
 const TAU = Math.PI * 2;
 
 const TIERS = [
@@ -226,9 +226,12 @@ const TIERS = [
   { min: 30, name: '황금 용왕',     emoji: '👑' },
 ];
 const tierOf = (L) => { let t = 0; for (let i = 0; i < TIERS.length; i++) if (L >= TIERS[i].min) t = i; return t; };
-const needXp = (L) => 6 + L * 4;
-const radiusOf = (L) => 10 + (L - 1) * 0.85;
-const targetLen = (L) => Math.round(8 + L * 2.6);
+const needXp = (L) => Math.max(2, Math.round((6 + L * 4) / 5));
+// Lv.30까지는 쑥쑥, 그 뒤로는 천천히 자라다 멈춤 (맵보다 커지지 않게)
+const grow30 = (L) => (L <= 30 ? 0 : 1 - Math.exp(-(L - 30) / 150));
+const radiusOf = (L) => (L <= 30 ? 10 + (L - 1) * 0.85 : 34.65 + 25 * grow30(L));
+const targetLen = (L) => (L <= 30 ? Math.round(8 + L * 2.6) : Math.round(86 + 34 * grow30(L)));
+const PLAYER_SPEED = 260;
 
 // 단계별 색 팔레트 (a: 몸, b: 무늬, c: 포인트) — 색깔 선택 4가지
 const PALETTES = [
@@ -491,7 +494,7 @@ function makeWorm(o) {
     x: o.x, y: o.y, angle: o.angle != null ? o.angle : Math.random() * TAU, look: null,
     r: radiusOf(level), stamina: 1, boostWant: false, boosting: false, invuln: o.invuln || 0,
     segs: [],
-    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(124, 146), chaseT: 0, cool: 0 },
+    ai: { timer: 0, mode: 'food', wander: Math.random() * TAU, aggro: rand(0.25, 0.6), speed: rand(200, 232), chaseT: 0, cool: 0 },
   };
   w.targetAngle = w.angle;
   const sp = w.r * 0.55, len = targetLen(level);
@@ -623,13 +626,13 @@ function showToast(html, ms) {
    ========================================================= */
 function moveWorm(w, dt) {
   w.r += (radiusOf(w.level) - w.r) * Math.min(1, dt * 3);
-  const turnRate = (w.isPlayer ? 5.4 : 4.2) * (1 - (w.level - 1) * 0.012);
+  const turnRate = (w.isPlayer ? 7 : 5.5) * clamp(1 - (w.r - 10) * 0.014, 0.5, 1);
   w.angle += clamp(angDiff(w.targetAngle, w.angle), -turnRate * dt, turnRate * dt);
 
   const boosting = w.boostWant && w.stamina > 0.02;
   w.stamina = boosting ? Math.max(0, w.stamina - dt * 0.45) : Math.min(1, w.stamina + dt * 0.22);
   w.boosting = boosting;
-  const base = w.isPlayer ? 165 : w.ai.speed;
+  const base = w.isPlayer ? PLAYER_SPEED : w.ai.speed;
   const sp = boosting ? base * 1.75 : base;
   w.x += Math.cos(w.angle) * sp * dt;
   w.y += Math.sin(w.angle) * sp * dt;
@@ -691,7 +694,7 @@ function aiThink(w, dt) {
   }
 
   let ta = w.targetAngle, boost = false;
-  const danger = 70 + w.r * 3;
+  const danger = 110 + w.r * 3;
   if (threat && td < danger) {
     ta = Math.atan2(w.y - threat.y, w.x - threat.x);
     boost = td < danger * 0.5 && w.stamina > 0.15;
@@ -701,7 +704,7 @@ function aiThink(w, dt) {
     ai.mode = 'chase'; ai.chaseT += step;
     const lead = Math.min(80, pd * 0.4);
     ta = Math.atan2(prey.y + Math.sin(prey.angle) * lead - w.y, prey.x + Math.cos(prey.angle) * lead - w.x);
-    boost = pd < 200 && w.stamina > 0.5 && Math.random() < ai.aggro;
+    boost = pd < 260 && w.stamina > 0.5 && Math.random() < ai.aggro;
     if (ai.chaseT > (prey.isPlayer ? 3 : 4.5)) { ai.cool = 3.5; ai.mode = 'food'; }
   } else {
     ai.mode = 'food';
@@ -862,20 +865,20 @@ function update(dt) {
   for (let i = texts.length - 1; i >= 0; i--) { texts[i].life -= dt; texts[i].y -= 40 * dt; if (texts[i].life <= 0) texts.splice(i, 1); }
 
   // 카메라
-  let tx = cam.x, ty = cam.y, lvl = 6;
-  if (player && player.alive) { tx = player.x; ty = player.y; lvl = player.level; }
+  let tx = cam.x, ty = cam.y, camR = radiusOf(6);
+  if (player && player.alive) { tx = player.x; ty = player.y; camR = player.r; }
   else if (state === 'menu') {
     attractTimer -= dt;
     if (!attractTarget || !attractTarget.alive || attractTimer <= 0) {
       attractTarget = worms.reduce((b, w) => (!b || w.level > b.level ? w : b), null);
       attractTimer = 12;
     }
-    if (attractTarget) { tx = attractTarget.x; ty = attractTarget.y; lvl = attractTarget.level; }
+    if (attractTarget) { tx = attractTarget.x; ty = attractTarget.y; camR = attractTarget.r; }
   }
   const k = Math.min(1, dt * 6);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
   const base = clamp(Math.min(W, H) / 520, 0.78, 1.1);
-  const zt = base * clamp(1 - (lvl - 1) * 0.013, 0.6, 1);
+  const zt = base * clamp(1 - (camR - 10) * 0.0145, 0.5, 1);
   cam.z += (zt - cam.z) * Math.min(1, dt * 2);
 
   if (state === 'play') {
@@ -998,7 +1001,7 @@ function drawMini() {
   for (const w of worms) {
     if (!w.alive || w.isPlayer) continue;
     mctx.fillStyle = w.level > player.level ? '#ff5a5a' : w.level < player.level ? '#6dff8a' : '#ffd84d';
-    mctx.beginPath(); mctx.arc(c + w.x * k, c + w.y * k, 3 + w.level * 0.15, 0, TAU); mctx.fill();
+    mctx.beginPath(); mctx.arc(c + w.x * k, c + w.y * k, 3 + w.r * 0.1, 0, TAU); mctx.fill();
   }
   const vw = W / cam.z * k, vh = H / cam.z * k;
   mctx.strokeStyle = 'rgba(255,255,255,0.35)'; mctx.lineWidth = 2;
